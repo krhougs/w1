@@ -184,7 +184,7 @@ spawning the `w1` binary.
 
 ```toml
 [dependencies]
-w1 = "0.2"
+w1 = "0.3"
 ```
 
 - `ResolvedTarget::resolve(program, args)` identifies the agent from its command line.
