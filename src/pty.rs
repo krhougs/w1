@@ -44,14 +44,14 @@ pub fn run_target(target: ResolvedTarget, force_wrap: bool) -> u8 {
 
 fn run_passthrough(target: &ResolvedTarget) -> u8 {
     eprintln!(
-        "\x1b[36m[w1]\x1b[0m {} ({}) 原生支持 OSC 7501 (Program Status Protocol)，无需 Wrap，直接启动…",
+        "\x1b[36m[w1]\x1b[0m {} ({}) supports OSC 7501 (Program Status Protocol) natively; launching it directly without wrapping…",
         target.display_name, target.app_id
     );
 
     let code = spawn_and_wait_direct(target);
 
     eprintln!(
-        "\x1b[36m[w1]\x1b[0m {} 已退出（该应用原生支持 OSC 7501，日常使用直接运行 `{}` 即可，无需 `w1` 包装）。",
+        "\x1b[36m[w1]\x1b[0m {} exited. It supports OSC 7501 natively, so you can run `{}` directly without `w1`.",
         target.display_name,
         target.program.to_string_lossy()
     );
@@ -68,7 +68,7 @@ fn spawn_and_wait_direct(target: &ResolvedTarget) -> u8 {
     let mut child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
-            eprintln!("w1: 无法启动 `{}`: {err}", target.program.to_string_lossy());
+            eprintln!("w1: failed to launch `{}`: {err}", target.program.to_string_lossy());
             return 127;
         }
     };
@@ -99,7 +99,7 @@ fn spawn_and_wait_direct(target: &ResolvedTarget) -> u8 {
             }
         }
         Err(err) => {
-            eprintln!("w1: 等待 `{}` 退出失败: {err}", target.program.to_string_lossy());
+            eprintln!("w1: failed to wait for `{}`: {err}", target.program.to_string_lossy());
             1
         }
     }

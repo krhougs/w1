@@ -60,58 +60,58 @@ fn print_help() {
         "\
 w1 (Wrap7501) {} — OSC 7501 (Program Status Protocol) Coding Agent Wrapper
 
-用法:
-  w1 [w1选项] <agent命令> [agent参数...]
+Usage:
+  w1 [w1 options] <agent command> [agent args...]
 
-示例:
+Examples:
   w1 codex --yolo
   w1 gemini
   w1 opencode
   w1 claude
 
-选项:
-  --list-agents   列出已识别的 Coding Agent 及其 OSC 7501 支持状态
-  --force-wrap    即使目标应用已原生支持 OSC 7501 也强制使用 PTY 包装
-  -h, --help      显示帮助信息
-  -V, --version   显示版本信息",
+Options:
+  --list-agents   List recognised coding agents and how each is handled
+  --force-wrap    Wrap in a PTY even if the program fully supports OSC 7501
+  -h, --help      Show this help
+  -V, --version   Show version",
         env!("CARGO_PKG_VERSION")
     );
 }
 
 fn print_agents() {
     println!(
-        "{:<16} {:<22} {:<14} 说明",
-        "APP ID", "名称", "模式"
+        "{:<16} {:<22} {:<12} Notes",
+        "APP ID", "Name", "Mode"
     );
     println!("{}", "-".repeat(76));
     for &kind in AgentKind::ALL {
         let mode = match kind.native_support() {
-            NativeSupport::Full => "原生直通 (Passthrough)",
-            NativeSupport::Partial => "原生 + w1 补全",
-            NativeSupport::None => "w1 包装 (Wrap7501)",
+            NativeSupport::Full => "Passthrough",
+            NativeSupport::Partial => "Native + w1",
+            NativeSupport::None => "Wrapped",
         };
         let note = match kind {
-            AgentKind::Claude => "Claude Code >= 2.1.295 原生支持 OSC 7501",
-            AgentKind::Pi => "Pi Coding Agent >= 1.1.0 原生支持 OSC 7501",
-            AgentKind::Omp => "原生只报状态：w1 补 working/标题/摘要/进度（会话 JSONL），并去掉标题 spinner 动画",
-            AgentKind::Codex => "终端 + ~/.codex/state_5.sqlite 线程（按提交时刻认领）+ rollout JSONL",
-            AgentKind::Gemini => "终端/OSC 标题 + $GEMINI_CLI_HOME/.gemini/tmp/<项目>/chats JSONL",
-            AgentKind::OpenCode => "终端 + ~/.local/share/opencode/opencode.db（会话/消息/todo/子会话）",
-            AgentKind::Kilo => "终端 + ~/.local/share/kilo（与 OpenCode 同构的会话库，未实测）",
-            AgentKind::Grok => "原生 + w1 补全：active_sessions.json（按 pid）+ events/updates JSONL",
-            AgentKind::Devin => "终端 + ~/.local/share/devin/cli（session_locks 按 pid）sessions.db",
-            AgentKind::Cursor => "终端 + ~/.cursor chats meta.json + agent-transcripts（未登录，未实测回合）",
-            AgentKind::Antigravity => "终端 + agy 日志（按 pid）+ conversation 数据库",
-            AgentKind::Droid => "原生 + w1 补全：~/.factory/sessions/<cwd> JSONL（标题/摘要/todo/错误）",
-            AgentKind::GithubCopilot => "终端 + ~/.copilot/session-state（inuse.<pid>.lock）events.jsonl",
-            AgentKind::Amp => "原生 + w1 补全：终端画面（线程在服务端，本地无会话记录）",
-            AgentKind::Kimi => "终端 + $KIMI_CODE_HOME/sessions/wd_*/ state.json & wire.jsonl",
-            AgentKind::Qwen => "终端/OSC 标题 + ~/.qwen/sessions/<pid>.json + projects/*/chats JSONL",
-            AgentKind::Crush => "原生 + w1 补全：<数据目录>/crush.db（标题/摘要/todo/错误）",
-            _ => "终端画面 + OSC 0/2/9 实时状态与摘要推断",
+            AgentKind::Claude => "Claude Code >= 2.1.295 supports OSC 7501 natively",
+            AgentKind::Pi => "Pi Coding Agent >= 1.1.0 supports OSC 7501 natively",
+            AgentKind::Omp => "Native state only; w1 adds working/title/summary/progress (session JSONL) and strips the title spinner",
+            AgentKind::Codex => "Screen + ~/.codex/state_5.sqlite threads (claimed by prompt time) + rollout JSONL",
+            AgentKind::Gemini => "Screen/OSC title + $GEMINI_CLI_HOME/.gemini/tmp/<project>/chats JSONL",
+            AgentKind::OpenCode => "Screen + ~/.local/share/opencode/opencode.db (sessions/messages/todos/subagents)",
+            AgentKind::Kilo => "Screen + ~/.local/share/kilo (same store as OpenCode; untested)",
+            AgentKind::Grok => "Native + w1: active_sessions.json (by pid) + events/updates JSONL",
+            AgentKind::Devin => "Screen + ~/.local/share/devin/cli sessions.db (session_locks by pid)",
+            AgentKind::Cursor => "Screen + ~/.cursor chats meta.json + agent-transcripts (turns untested)",
+            AgentKind::Antigravity => "Screen + agy log (by pid) + conversation databases",
+            AgentKind::Droid => "Native + w1: ~/.factory/sessions/<cwd> JSONL (title/summary/todos/errors)",
+            AgentKind::GithubCopilot => "Screen + ~/.copilot/session-state events.jsonl (inuse.<pid>.lock)",
+            AgentKind::Amp => "Native + w1: screen only (threads live server-side)",
+            AgentKind::Kimi => "Screen + $KIMI_CODE_HOME/sessions/wd_*/ state.json & wire.jsonl",
+            AgentKind::Qwen => "Screen/OSC title + ~/.qwen/sessions/<pid>.json + projects/*/chats JSONL",
+            AgentKind::Crush => "Native + w1: <data dir>/crush.db (title/summary/todos/errors)",
+            _ => "Screen + OSC 0/2/9 heuristics",
         };
         println!(
-            "{:<16} {:<22} {:<22} {}",
+            "{:<16} {:<22} {:<12} {}",
             kind.app_id(),
             kind.display_name(),
             mode,
