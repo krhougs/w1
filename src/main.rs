@@ -1,17 +1,7 @@
-pub mod agents;
-pub mod detect;
-pub mod inspect;
-pub mod osc7501;
-pub mod procs;
-pub mod pty;
-pub mod report;
-pub mod screen;
-pub mod stream;
-
 use std::ffi::OsString;
 use std::process::ExitCode;
 
-use agents::{AgentKind, NativeSupport, ResolvedTarget};
+use w1::{AgentKind, NativeSupport, ResolvedTarget};
 
 fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1).peekable();
@@ -51,7 +41,7 @@ fn main() -> ExitCode {
     let rest_args: Vec<OsString> = args.collect();
 
     let target = ResolvedTarget::resolve(program, rest_args);
-    let code = pty::run_target(target, force_wrap);
+    let code = w1::run_target(target, force_wrap);
     ExitCode::from(code)
 }
 

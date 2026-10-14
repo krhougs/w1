@@ -9,6 +9,13 @@ readme = "README.md"
 keywords = ["osc7501", "terminal", "pty", "coding-agent", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["AGENTS.md", ".gitignore"]
+rust-version = "1.85"
+resolver = "3"
+
+[[bin]]
+name = "w1"
+path = "src/main.rs"
+doc = false
 
 [dependencies]
 alacritty_terminal = "=0.26.0"

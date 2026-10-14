@@ -7,19 +7,14 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::{Duration, Instant};
 
-use crate::agents::{AgentKind, NativeSupport, ResolvedTarget};
-use crate::osc7501::OscState;
-use crate::report::Reporter;
-use crate::stream::{Captured, OutputStream, TitleFilter};
+use crate::agents::{NativeSupport, ResolvedTarget};
+use crate::session::Session;
 
 const STDIN: RawFd = 0;
 const STDOUT: RawFd = 1;
 const BUFFER_LIMIT: usize = 256 * 1024;
 const READ_CHUNK: usize = 64 * 1024;
-const TICK_INTERVAL: Duration = Duration::from_millis(180);
-const IDLE_TICK_INTERVAL: Duration = Duration::from_millis(900);
 const FINAL_FLUSH_TIMEOUT: Duration = Duration::from_secs(1);
-const OSC_HEAD_STALL: Duration = Duration::from_millis(120);
 
 static SIGNAL_PIPE: AtomicI32 = AtomicI32::new(-1);
 
@@ -204,32 +199,19 @@ impl PtyWrapper {
         let master = self.master.as_raw_fd();
         let mut to_inner: Vec<u8> = Vec::new();
         let mut to_outer: Vec<u8> = Vec::new();
-        let mut pending_reports: Vec<u8> = Vec::new();
         let mut chunk = vec![0u8; READ_CHUNK];
-        let mut captured: Vec<Captured> = Vec::new();
         let mut exit_code: Option<u8> = None;
         let mut inner_closed = false;
         let mut outer_closed = false;
 
-        let titles = match target.agent {
-            Some(AgentKind::Omp) => TitleFilter::Omp,
-            Some(AgentKind::Codex) => TitleFilter::Drop,
-            Some(_) => TitleFilter::Despin,
-            None => TitleFilter::Off,
-        };
-        let mut stream = OutputStream::new(titles);
-        let mut reporter = Reporter::new(
+        let mut session = Session::new(
             &target,
             self.child,
             self.initial_size.ws_col,
             self.initial_size.ws_row,
-            titles == TitleFilter::Drop,
         );
-        reporter.initial(&mut to_outer);
-
-        let mut last_activity = Instant::now();
-        let mut last_output = Instant::now();
-        let mut next_tick = Instant::now() + TICK_INTERVAL;
+        session.start(&mut to_outer);
+        let mut next_tick = Instant::now();
 
         while !(outer_closed || (exit_code.is_some() && inner_closed)) {
             let now = Instant::now();
@@ -250,9 +232,6 @@ impl PtyWrapper {
                 Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
                 Err(_) => break,
             };
-
-            let now = Instant::now();
-            let mut saw_pty_output = false;
 
             if ready[3].0 {
                 let mut sigbuf = [0u8; 64];
@@ -278,7 +257,7 @@ impl PtyWrapper {
                     }
                 }
                 if let Some(sz) = self.sync_window_size() {
-                    reporter.resize(sz.ws_col, sz.ws_row);
+                    session.resize(sz.ws_col, sz.ws_row);
                 }
                 if exit_code.is_none() {
                     exit_code = self.reap_child();
@@ -289,11 +268,8 @@ impl PtyWrapper {
                 match read_fd(STDIN, &mut chunk) {
                     ReadOutcome::Data(n) => {
                         let input = chunk.get(..n).unwrap_or_default();
-                        if is_submit(input) {
-                            reporter.user_submitted();
-                        }
+                        session.input(input);
                         to_inner.extend_from_slice(input);
-                        last_activity = now;
                     }
                     ReadOutcome::Closed => outer_closed = true,
                     ReadOutcome::Pending => {}
@@ -304,20 +280,7 @@ impl PtyWrapper {
                 match read_fd(master, &mut chunk) {
                     ReadOutcome::Data(n) => {
                         let data = chunk.get(..n).unwrap_or_default();
-                        stream.process(data, &mut to_outer, &mut captured);
-                        reporter.feed_output(data, stream.take_reset());
-                        for item in captured.drain(..) {
-                            match item {
-                                Captured::Probe(term) => {
-                                    to_inner.extend_from_slice(b"\x1b]7501;?");
-                                    to_inner.extend_from_slice(term.bytes());
-                                }
-                                Captured::Report(payload) => reporter.native_report(&payload),
-                            }
-                        }
-                        saw_pty_output = true;
-                        last_activity = now;
-                        last_output = now;
+                        session.output(data, &mut to_outer, &mut to_inner);
                     }
                     ReadOutcome::Closed => {
                         inner_closed = true;
@@ -329,24 +292,7 @@ impl PtyWrapper {
                 }
             }
 
-            if stream.stalled_in_osc_head() && now.duration_since(last_output) >= OSC_HEAD_STALL {
-                stream.flush_stalled_osc(&mut to_outer);
-            }
-
-            if saw_pty_output || now >= next_tick {
-                reporter.evaluate(now, &mut pending_reports);
-                let interval = if now.duration_since(last_activity) < Duration::from_secs(3)
-                    || reporter.current_state() == OscState::Working
-                {
-                    TICK_INTERVAL
-                } else {
-                    IDLE_TICK_INTERVAL
-                };
-                next_tick = now + interval;
-            }
-            if !pending_reports.is_empty() && stream.at_boundary() {
-                to_outer.append(&mut pending_reports);
-            }
+            next_tick = session.tick(Instant::now(), &mut to_outer);
 
             if ready[1].1 && write_fd(master, &mut to_inner).is_err() {
                 inner_closed = true;
@@ -360,15 +306,7 @@ impl PtyWrapper {
             .or_else(|| self.reap_child())
             .unwrap_or(128 + libc::SIGHUP as u8);
 
-        // Whatever the child left half-written is gone; reset the outer parser before reporting.
-        if !stream.at_boundary() {
-            to_outer.extend_from_slice(b"\x18");
-        }
-        to_outer.append(&mut pending_reports);
-        let mut final_reports = Vec::new();
-        reporter.finish(code, &mut final_reports);
-        to_outer.append(&mut final_reports);
-
+        session.finish(code, &mut to_outer);
         if !outer_closed {
             flush_stdout(&mut to_outer);
         }
@@ -411,19 +349,6 @@ impl PtyWrapper {
             }
         }
     }
-}
-
-/// Enter in any keyboard encoding agents enable: plain CR/LF, kitty (`CSI 13 u`) or
-/// xterm modifyOtherKeys (`CSI 27;…;13 ~`).
-fn is_submit(input: &[u8]) -> bool {
-    input.iter().any(|b| matches!(b, b'\r' | b'\n'))
-        || contains(input, b"\x1b[13u")
-        || contains(input, b"\x1b[13;")
-        || contains(input, b";13~")
-}
-
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack.windows(needle.len()).any(|w| w == needle)
 }
 
 fn to_cstring(s: &OsString) -> io::Result<CString> {

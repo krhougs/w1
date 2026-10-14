@@ -40,8 +40,9 @@ hint, runs them directly, and prints the hint again when they exit.
 
 ### Requirements
 
-- macOS or another Unix. Only macOS has been tested.
-- A Rust toolchain. If you don't have one, install it with [rustup](https://rustup.rs):
+- macOS or Linux (glibc or musl). Tested on macOS, and on x86_64 Ubuntu 22.04/24.04,
+  Debian 12/13, Fedora 42, Rocky 9, Arch, openSUSE Leap 15.6 and Alpine 3.22.
+- Rust 1.85 or newer. If you don't have it, install it with [rustup](https://rustup.rs):
 
   ```sh
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -155,13 +156,58 @@ Behaviour that applies to every agent:
   and `w1` sets the terminal title (OSC 0) to the same title it reports over OSC 7501:
   `w1 - <agent name>` until a session exists, then the session title, cleared on exit. State detection still sees the raw title.
 
+## Using w1 as a library
+
+The crate is also a library (`w1` on crates.io), for hosts that already run agents in their
+own PTYs, such as terminals, multiplexers or relays, and want the same status reporting without
+spawning the `w1` binary.
+
+```toml
+[dependencies]
+w1 = "0.1"
+```
+
+- `ResolvedTarget::resolve(program, args)` identifies the agent from its command line.
+- `Session` is the whole engine, without any file descriptors:
+  - `start` emits the initial record;
+  - `input` takes the user's keystrokes (to detect submits);
+  - `output` takes the agent's output. It returns the filtered bytes for the terminal and the
+    replies for the agent (answers to its OSC 7501 probe);
+  - `tick` re-evaluates the status and returns its next deadline;
+  - `resize` follows PTY size changes;
+  - `finish` emits the final records.
+
+  Status records are only inserted between complete escape sequences.
+- `run_target` runs the full `w1` behaviour (passthrough or PTY wrapping) on the current
+  process's terminal.
+- `osc7501` encodes and parses OSC 7501 records. `agents`, `detect`, `inspect` and `stream`
+  expose the lower layers.
+
+```rust
+use std::time::Instant;
+use w1::{ResolvedTarget, Session};
+
+let target = ResolvedTarget::resolve("codex".into(), vec!["--yolo".into()]);
+let mut session = Session::new(&target, child_pid, cols, rows);
+let (mut to_terminal, mut to_child) = (Vec::new(), Vec::new());
+session.start(&mut to_terminal);
+// I/O loop:
+session.input(&keys);                                          // then write keys to the PTY
+session.output(&pty_bytes, &mut to_terminal, &mut to_child);   // write both buffers out
+let deadline = session.tick(Instant::now(), &mut to_terminal); // call again by `deadline`
+// On exit:
+session.finish(exit_code, &mut to_terminal);
+```
+
 ## Project layout
 
 | File | Role |
 |---|---|
 | `src/main.rs` | CLI parsing, `--list-agents` notes |
+| `src/lib.rs` | Library root and re-exports |
+| `src/session.rs` | `Session`: the embeddable engine between an agent's PTY and the terminal |
 | `src/agents.rs` | `AgentKind`: command → agent identification, OSC `app` id, native support level |
-| `src/pty.rs` | PTY spawn, I/O loop, signal and resize forwarding, passthrough mode, title filter selection |
+| `src/pty.rs` | The `w1` PTY: spawn, I/O loop driving a `Session`, signal and resize forwarding, passthrough mode |
 | `src/stream.rs` | Splits the child's output: captures OSC 7501 reports and probes, filters titles |
 | `src/screen.rs` | Virtual terminal (alacritty) and prompt marks |
 | `src/detect.rs` | Per-agent screen rule manifests (TOML), message extraction, state stabiliser |
