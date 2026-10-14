@@ -36,6 +36,9 @@ pub struct Reporter {
     has_tracker: bool,
     /// When the screen alone ended a turn the store still shows as running.
     done_hold: Option<Instant>,
+    /// The child's own OSC 0/1/2 titles are dropped, so `w1` sets the terminal title itself.
+    owns_title: bool,
+    sent_title: Option<String>,
 }
 
 /// How long a turn end seen only on screen waits for the store to say how it ended (an abort
@@ -46,7 +49,13 @@ const STORE_CONFIRM_WAIT: std::time::Duration = std::time::Duration::from_secs(2
 const DETAIL_REFRESH: std::time::Duration = std::time::Duration::from_millis(400);
 
 impl Reporter {
-    pub fn new(target: &ResolvedTarget, child_pid: i32, cols: u16, rows: u16) -> Self {
+    pub fn new(
+        target: &ResolvedTarget,
+        child_pid: i32,
+        cols: u16,
+        rows: u16,
+        owns_title: bool,
+    ) -> Self {
         let ctx = LaunchContext::new(target.agent, &target.argv, Some(child_pid));
         let submits = ctx.submits.clone();
         let inspector = SessionInspector::new(target.agent, ctx);
@@ -69,6 +78,8 @@ impl Reporter {
             submits,
             has_tracker: !screen_title_fallback,
             done_hold: None,
+            owns_title,
+            sent_title: None,
         }
     }
 
@@ -78,6 +89,7 @@ impl Reporter {
         if reset || marks.contains(&PromptMark::PromptStart) {
             self.emitter.invalidate();
             self.last_emit = None;
+            self.sent_title = None;
         }
         for mark in marks {
             match mark {
@@ -142,13 +154,34 @@ impl Reporter {
     }
 
     pub fn initial(&mut self, out: &mut Vec<u8>) {
-        let root = OscRecord::new(OscState::Idle).with_app(&self.app_id);
+        let title = self.title(&ExternalInsight::default());
+        self.set_terminal_title(title.as_deref(), out);
+        let root = OscRecord::new(OscState::Idle)
+            .with_app(&self.app_id)
+            .with_title(title);
         self.emitter.sync(root, &[], out);
+    }
+
+    fn set_terminal_title(&mut self, title: Option<&str>, out: &mut Vec<u8>) {
+        if !self.owns_title {
+            return;
+        }
+        let title = title
+            .and_then(|t| crate::osc7501::sanitize_single_line(t, crate::osc7501::MAX_TITLE_DECODED_BYTES))
+            .unwrap_or_default();
+        if self.sent_title.as_deref() == Some(title.as_str()) {
+            return;
+        }
+        out.extend_from_slice(b"\x1b]0;");
+        out.extend_from_slice(title.as_bytes());
+        out.extend_from_slice(b"\x1b\\");
+        self.sent_title = Some(title);
     }
 
     pub fn evaluate(&mut self, now: Instant, out: &mut Vec<u8>) {
         let insight = self.inspector.snapshot();
         let root = self.compose_root(&insight, now);
+        self.set_terminal_title(root.title.clone().as_deref(), out);
         if self
             .last_emit
             .is_some_and(|(at, state)| state == root.state && now.duration_since(at) < DETAIL_REFRESH)
@@ -184,14 +217,21 @@ impl Reporter {
                 .with_msg(Some(msg))
         });
         self.emitter.emit_exit(final_record, out);
+        if self.sent_title.is_some() {
+            self.set_terminal_title(Some(""), out);
+        }
     }
 
     fn title(&self, insight: &ExternalInsight) -> Option<String> {
-        insight.title.clone().or_else(|| {
-            self.screen_title_fallback
-                .then(|| self.screen.clean_title(&self.app_id, &self.display_name))
-                .flatten()
-        })
+        insight
+            .title
+            .clone()
+            .or_else(|| {
+                self.screen_title_fallback
+                    .then(|| self.screen.clean_title(&self.app_id, &self.display_name))
+                    .flatten()
+            })
+            .or_else(|| self.owns_title.then(|| format!("w1 - {}", self.display_name)))
     }
 
     fn compose_root(&mut self, insight: &ExternalInsight, now: Instant) -> OscRecord {

@@ -218,7 +218,13 @@ impl PtyWrapper {
             None => TitleFilter::Off,
         };
         let mut stream = OutputStream::new(titles);
-        let mut reporter = Reporter::new(&target, self.child, self.initial_size.ws_col, self.initial_size.ws_row);
+        let mut reporter = Reporter::new(
+            &target,
+            self.child,
+            self.initial_size.ws_col,
+            self.initial_size.ws_row,
+            titles == TitleFilter::Drop,
+        );
         reporter.initial(&mut to_outer);
 
         let mut last_activity = Instant::now();
