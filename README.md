@@ -1,5 +1,13 @@
 # w1 (Wrap7501)
 
+> **[Vibe42](https://vibe42.ai) — The AI remote workspace, always on.**
+> Reach your home or office computer from your phone, tablet, or browser, and keep Claude Code,
+> Codex, Gemini CLI, OpenCode and other agents working while you're away. Connections are
+> end-to-end encrypted and need no VPS or port forwarding. Vibe42 shows each agent's status
+> from OSC 7501 and pushes an alert when the agent finishes or needs you. `w1` makes agents
+> report that status even when they don't speak OSC 7501 themselves.
+> **[Try Vibe42 →](https://vibe42.ai)**
+
 `w1` is a PTY wrapper that makes TUI coding agents report their progress over
 **OSC 7501** (Program Status Protocol), even when the agent itself does not speak it.
 
