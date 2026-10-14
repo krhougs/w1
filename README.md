@@ -34,6 +34,23 @@ agent's config files and without installing hooks. The information comes from th
 Agents that already fully support OSC 7501 (Claude Code, Pi) are not wrapped. `w1` prints a
 hint, runs them directly, and prints the hint again when they exit.
 
+Inside a terminal multiplexer, nothing may answer such an agent's `OSC 7501;?` support probe.
+The multiplexer swallows it, so the agent concludes the terminal has no OSC 7501 and stays
+silent. When `w1` detects a multiplexer, it runs the agent in a PTY and answers the probe
+itself. Every other byte, including the agent's own OSC 7501 records, is forwarded unchanged.
+
+| Multiplexer | Detected by |
+|---|---|
+| Herdr | `HERDR_ENV=1` |
+| tmux | `TMUX`, or `TERM=tmux*` |
+| Zellij | `ZELLIJ` |
+| GNU Screen | `STY`, or `TERM=screen*` |
+
+To turn this off and launch the agent directly, pass `--no-probe-answer` or set
+`W1_NO_PROBE_ANSWER=1`. Any value other than empty, `0` or `false` turns it off. The switch
+only affects these fully supporting agents. Agents that `w1` wraps always have their probe
+answered by `w1`, because `w1` is their reporter.
+
 `w1` forwards argv, the environment, the terminal size, signals, and the exit status unchanged.
 
 ## Install
@@ -90,8 +107,10 @@ cargo uninstall w1
 ```
 w1 [w1 options] <agent command> [agent args...]
 
-  --list-agents   list recognised agents and how each is handled
-  --force-wrap    wrap even agents that natively support OSC 7501
+  --list-agents       list recognised agents and how each is handled
+  --force-wrap        wrap even agents that natively support OSC 7501
+  --no-probe-answer   inside a multiplexer, do not answer the OSC 7501 probe of agents that
+                      natively support OSC 7501 (same as W1_NO_PROBE_ANSWER=1)
   -h, --help
   -V, --version
 ```
@@ -114,7 +133,8 @@ session.
 
 Mode:
 
-- **Passthrough**: the agent supports OSC 7501 fully. `w1` only prints a hint.
+- **Passthrough**: the agent supports OSC 7501 fully. `w1` only prints a hint. Inside a
+  multiplexer, `w1` also answers the agent's probe (see above).
 - **Merge**: the agent emits partial OSC 7501. `w1` wraps it, answers its probe, and fills in
   the rest.
 - **Wrap**: the agent has no OSC 7501. Everything is derived by `w1`.
@@ -178,8 +198,13 @@ w1 = "0.2"
   - `finish` emits the final records.
 
   Status records are only inserted between complete escape sequences.
-- `run_target` runs the full `w1` behaviour (passthrough or PTY wrapping) on the current
-  process's terminal.
+
+  `Session::probe_only()` is for an agent that fully supports OSC 7501 but sits behind
+  something that cannot answer its probe. It answers the probe, forwards every other byte
+  unchanged, and emits no records of its own.
+- `run_target(target, RunOptions)` runs the full `w1` behaviour (passthrough, probe answering,
+  or PTY wrapping) on the current process's terminal. `RunOptions::from_env()` applies
+  `W1_NO_PROBE_ANSWER`. `detect_multiplexer()` reports the multiplexer `w1` detected.
 - `osc7501` encodes and parses OSC 7501 records. `agents`, `detect`, `inspect` and `stream`
   expose the lower layers.
 

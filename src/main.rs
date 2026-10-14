@@ -1,11 +1,11 @@
 use std::ffi::OsString;
 use std::process::ExitCode;
 
-use w1::{AgentKind, NativeSupport, ResolvedTarget};
+use w1::{AgentKind, NativeSupport, ResolvedTarget, RunOptions};
 
 fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1).peekable();
-    let mut force_wrap = false;
+    let mut options = RunOptions::from_env();
 
     while let Some(arg) = args.peek() {
         let s = arg.to_string_lossy();
@@ -23,7 +23,11 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--force-wrap" => {
-                force_wrap = true;
+                options.force_wrap = true;
+                let _ = args.next();
+            }
+            "--no-probe-answer" => {
+                options.answer_probe = false;
                 let _ = args.next();
             }
             "--" => {
@@ -41,7 +45,7 @@ fn main() -> ExitCode {
     let rest_args: Vec<OsString> = args.collect();
 
     let target = ResolvedTarget::resolve(program, rest_args);
-    let code = w1::run_target(target, force_wrap);
+    let code = w1::run_target(target, options);
     ExitCode::from(code)
 }
 
@@ -60,11 +64,15 @@ Examples:
   w1 claude
 
 Options:
-  --list-agents   List recognised coding agents and how each is handled
-  --force-wrap    Wrap in a PTY even if the program fully supports OSC 7501
-  -h, --help      Show this help
-  -V, --version   Show version",
-        env!("CARGO_PKG_VERSION")
+  --list-agents      List recognised coding agents and how each is handled
+  --force-wrap       Wrap in a PTY even if the program fully supports OSC 7501
+  --no-probe-answer  Inside a terminal multiplexer (Herdr, tmux, Zellij, GNU Screen), do not
+                     answer the OSC 7501 probe of a program that fully supports OSC 7501;
+                     launch it directly instead. Same as {}=1
+  -h, --help         Show this help
+  -V, --version      Show version",
+        env!("CARGO_PKG_VERSION"),
+        w1::pty::NO_PROBE_ANSWER_ENV
     );
 }
 

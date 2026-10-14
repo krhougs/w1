@@ -18,18 +18,78 @@ const FINAL_FLUSH_TIMEOUT: Duration = Duration::from_secs(1);
 
 static SIGNAL_PIPE: AtomicI32 = AtomicI32::new(-1);
 
-pub fn run_target(target: ResolvedTarget, force_wrap: bool) -> u8 {
-    if target.native == NativeSupport::Full && !force_wrap {
-        return run_passthrough(&target);
+/// Environment variable that turns off answering the OSC 7501 probe behind a multiplexer.
+pub const NO_PROBE_ANSWER_ENV: &str = "W1_NO_PROBE_ANSWER";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RunOptions {
+    /// Wrap the program in a PTY even if it fully supports OSC 7501.
+    pub force_wrap: bool,
+    /// Behind a terminal multiplexer, answer the OSC 7501 probe of a program that fully supports
+    /// the protocol, since the multiplexer may not answer it or pass it on.
+    pub answer_probe: bool,
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self {
+            force_wrap: false,
+            answer_probe: true,
+        }
+    }
+}
+
+impl RunOptions {
+    /// Defaults, with [`NO_PROBE_ANSWER_ENV`] set to anything but empty, `0` or `false` turning
+    /// off `answer_probe`.
+    pub fn from_env() -> Self {
+        let disabled = std::env::var_os(NO_PROBE_ANSWER_ENV)
+            .is_some_and(|v| !matches!(v.to_string_lossy().trim(), "" | "0" | "false"));
+        Self {
+            answer_probe: !disabled,
+            ..Self::default()
+        }
+    }
+}
+
+/// The terminal multiplexer this process runs in, from the environment it sets for its panes.
+pub fn detect_multiplexer() -> Option<&'static str> {
+    let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty());
+    if var("HERDR_ENV").is_some_and(|v| v == "1") {
+        return Some("Herdr");
+    }
+    if var("TMUX").is_some() {
+        return Some("tmux");
+    }
+    if var("ZELLIJ").is_some() {
+        return Some("Zellij");
+    }
+    if var("STY").is_some() {
+        return Some("GNU Screen");
+    }
+    let term = var("TERM")?;
+    let term = term.to_string_lossy();
+    if term.starts_with("tmux") {
+        Some("tmux")
+    } else if term.starts_with("screen") {
+        Some("GNU Screen")
+    } else {
+        None
+    }
+}
+
+pub fn run_target(target: ResolvedTarget, options: RunOptions) -> u8 {
+    if target.native == NativeSupport::Full && !options.force_wrap {
+        let multiplexer = options.answer_probe.then(detect_multiplexer).flatten();
+        return run_passthrough(&target, multiplexer);
     }
 
-    // SAFETY: isatty only inspects fd 0.
-    if unsafe { libc::isatty(STDIN) } != 1 {
+    if !stdin_is_tty() {
         return exec_or_spawn_direct(&target);
     }
 
     match PtyWrapper::start(&target) {
-        Ok(wrapper) => wrapper.run(target),
+        Ok(wrapper) => wrapper.run(&target, false),
         Err(err) => {
             eprintln!("w1: failed to initialize PTY wrapper ({err}), falling back to direct launch");
             exec_or_spawn_direct(&target)
@@ -37,19 +97,47 @@ pub fn run_target(target: ResolvedTarget, force_wrap: bool) -> u8 {
     }
 }
 
-fn run_passthrough(target: &ResolvedTarget) -> u8 {
-    eprintln!(
-        "\x1b[36m[w1]\x1b[0m {} ({}) supports OSC 7501 (Program Status Protocol) natively; launching it directly without wrapping…",
-        target.display_name, target.app_id
-    );
+fn stdin_is_tty() -> bool {
+    // SAFETY: isatty only inspects fd 0.
+    unsafe { libc::isatty(STDIN) == 1 }
+}
 
-    let code = spawn_and_wait_direct(target);
+fn run_passthrough(target: &ResolvedTarget, multiplexer: Option<&str>) -> u8 {
+    let multiplexer = multiplexer.filter(|_| stdin_is_tty());
+    let code = match multiplexer {
+        Some(multiplexer) => {
+            eprintln!(
+                "\x1b[36m[w1]\x1b[0m {} ({}) supports OSC 7501 (Program Status Protocol) natively; inside {multiplexer}, w1 answers its OSC 7501 probe and leaves everything else untouched (turn off with --no-probe-answer or {NO_PROBE_ANSWER_ENV}=1)…",
+                target.display_name, target.app_id
+            );
+            match PtyWrapper::start(target) {
+                Ok(wrapper) => wrapper.run(target, true),
+                Err(err) => {
+                    eprintln!("w1: failed to initialize PTY wrapper ({err}), launching directly");
+                    spawn_and_wait_direct(target)
+                }
+            }
+        }
+        None => {
+            eprintln!(
+                "\x1b[36m[w1]\x1b[0m {} ({}) supports OSC 7501 (Program Status Protocol) natively; launching it directly without wrapping…",
+                target.display_name, target.app_id
+            );
+            spawn_and_wait_direct(target)
+        }
+    };
 
-    eprintln!(
-        "\x1b[36m[w1]\x1b[0m {} exited. It supports OSC 7501 natively, so you can run `{}` directly without `w1`.",
-        target.display_name,
-        target.program.to_string_lossy()
-    );
+    let program = target.program.to_string_lossy();
+    match multiplexer {
+        Some(multiplexer) => eprintln!(
+            "\x1b[36m[w1]\x1b[0m {} exited. It supports OSC 7501 natively; outside {multiplexer} you can run `{program}` directly without `w1`.",
+            target.display_name
+        ),
+        None => eprintln!(
+            "\x1b[36m[w1]\x1b[0m {} exited. It supports OSC 7501 natively, so you can run `{program}` directly without `w1`.",
+            target.display_name
+        ),
+    }
     code
 }
 
@@ -195,7 +283,7 @@ impl PtyWrapper {
         Ok(wrapper)
     }
 
-    fn run(self, target: ResolvedTarget) -> u8 {
+    fn run(self, target: &ResolvedTarget, probe_only: bool) -> u8 {
         let master = self.master.as_raw_fd();
         let mut to_inner: Vec<u8> = Vec::new();
         let mut to_outer: Vec<u8> = Vec::new();
@@ -204,12 +292,16 @@ impl PtyWrapper {
         let mut inner_closed = false;
         let mut outer_closed = false;
 
-        let mut session = Session::new(
-            &target,
-            self.child,
-            self.initial_size.ws_col,
-            self.initial_size.ws_row,
-        );
+        let mut session = if probe_only {
+            Session::probe_only()
+        } else {
+            Session::new(
+                target,
+                self.child,
+                self.initial_size.ws_col,
+                self.initial_size.ws_row,
+            )
+        };
         session.start(&mut to_outer);
         let mut next_tick = Instant::now();
 

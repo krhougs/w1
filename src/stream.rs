@@ -67,6 +67,7 @@ pub struct OutputStream {
     saw_reset: bool,
     titles: TitleFilter,
     last_title: Option<(u8, String)>,
+    keep_reports: bool,
 }
 
 impl Default for OutputStream {
@@ -85,6 +86,15 @@ impl OutputStream {
             saw_reset: false,
             titles,
             last_title: None,
+            keep_reports: false,
+        }
+    }
+
+    /// Captures only the OSC 7501 probe; the child's own reports stay in the stream, in place.
+    pub fn probe_only() -> Self {
+        Self {
+            keep_reports: true,
+            ..Self::new(TitleFilter::Off)
         }
     }
 
@@ -229,7 +239,7 @@ impl OutputStream {
                 }
             }
             State::Osc7501 => match b {
-                0x07 => self.finish_7501(Terminator::Bel, captured),
+                0x07 => self.finish_7501(Terminator::Bel, out, captured),
                 0x1b => self.state = State::Osc7501Esc,
                 0x18 | 0x1a => {
                     self.payload.clear();
@@ -245,7 +255,7 @@ impl OutputStream {
             },
             State::Osc7501Esc => {
                 if b == b'\\' {
-                    self.finish_7501(Terminator::St, captured);
+                    self.finish_7501(Terminator::St, out, captured);
                 } else {
                     self.payload.clear();
                     self.held.push(0x1b);
@@ -341,7 +351,7 @@ impl OutputStream {
         self.last_title = Some((kind, title));
     }
 
-    fn finish_7501(&mut self, term: Terminator, captured: &mut Vec<Captured>) {
+    fn finish_7501(&mut self, term: Terminator, out: &mut Vec<u8>, captured: &mut Vec<Captured>) {
         self.state = State::Ground;
         let payload = std::mem::take(&mut self.payload);
         if self.overflow {
@@ -350,6 +360,11 @@ impl OutputStream {
         }
         if payload.first() == Some(&b'?') {
             captured.push(Captured::Probe(term));
+        } else if self.keep_reports {
+            out.extend_from_slice(b"\x1b]");
+            out.extend_from_slice(OSC_7501_HEAD);
+            out.extend_from_slice(&payload);
+            out.extend_from_slice(term.bytes());
         } else if let Ok(text) = String::from_utf8(payload) {
             captured.push(Captured::Report(text));
         }

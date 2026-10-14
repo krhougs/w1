@@ -6,8 +6,8 @@
 //! - [`ResolvedTarget::resolve`] identifies the agent from its command line.
 //! - [`Session`] sits between the agent's PTY and the terminal. It filters the agent's output,
 //!   answers its OSC 7501 probe, reads its session store, and emits OSC 7501 records.
-//! - [`run_target`] is the whole `w1` behaviour (passthrough or PTY wrapping) for the current
-//!   process's terminal.
+//! - [`run_target`] is the whole `w1` behaviour (passthrough, answering the probe behind a
+//!   multiplexer, or PTY wrapping) for the current process's terminal.
 //! - [`osc7501`] encodes and parses the protocol itself.
 //!
 //! ```no_run
@@ -43,5 +43,5 @@ pub mod stream;
 
 pub use agents::{AgentKind, NativeSupport, ResolvedTarget};
 pub use osc7501::{BlockedKind, OscRecord, OscState};
-pub use pty::run_target;
+pub use pty::{detect_multiplexer, run_target, RunOptions};
 pub use session::Session;

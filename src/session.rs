@@ -27,7 +27,7 @@ const OSC_HEAD_STALL: Duration = Duration::from_millis(120);
 /// `to_terminal` only between complete escape sequences.
 pub struct Session {
     stream: OutputStream,
-    reporter: Reporter,
+    reporter: Option<Reporter>,
     captured: Vec<Captured>,
     pending: Vec<u8>,
     dirty: bool,
@@ -44,7 +44,24 @@ impl Session {
         let now = Instant::now();
         Self {
             stream: OutputStream::new(titles),
-            reporter: Reporter::new(target, child_pid, cols, rows, titles == TitleFilter::Drop),
+            reporter: Some(Reporter::new(target, child_pid, cols, rows, titles == TitleFilter::Drop)),
+            captured: Vec::new(),
+            pending: Vec::new(),
+            dirty: false,
+            last_activity: now,
+            last_output: now,
+            next_tick: now,
+        }
+    }
+
+    /// For an agent that reports OSC 7501 itself but runs where nothing answers its support probe
+    /// (behind a terminal multiplexer): the probe is answered, every other byte is forwarded
+    /// unchanged, and no records of its own are emitted.
+    pub fn probe_only() -> Self {
+        let now = Instant::now();
+        Self {
+            stream: OutputStream::probe_only(),
+            reporter: None,
             captured: Vec::new(),
             pending: Vec::new(),
             dirty: false,
@@ -56,13 +73,15 @@ impl Session {
 
     /// The initial `idle` record (and title). Write it before any of the agent's output.
     pub fn start(&mut self, to_terminal: &mut Vec<u8>) {
-        self.reporter.initial(to_terminal);
+        if let Some(reporter) = &mut self.reporter {
+            reporter.initial(to_terminal);
+        }
     }
 
     /// Bytes the user typed, before they are written to the agent.
     pub fn input(&mut self, data: &[u8]) {
-        if is_submit(data) {
-            self.reporter.user_submitted();
+        if let Some(reporter) = self.reporter.as_mut().filter(|_| is_submit(data)) {
+            reporter.user_submitted();
         }
         self.last_activity = Instant::now();
     }
@@ -71,14 +90,21 @@ impl Session {
     /// agent is waiting for (answers to its OSC 7501 support probe) go to `to_child`.
     pub fn output(&mut self, data: &[u8], to_terminal: &mut Vec<u8>, to_child: &mut Vec<u8>) {
         self.stream.process(data, to_terminal, &mut self.captured);
-        self.reporter.feed_output(data, self.stream.take_reset());
+        let reset = self.stream.take_reset();
+        if let Some(reporter) = &mut self.reporter {
+            reporter.feed_output(data, reset);
+        }
         for item in self.captured.drain(..) {
             match item {
                 Captured::Probe(term) => {
                     to_child.extend_from_slice(b"\x1b]7501;?");
                     to_child.extend_from_slice(term.bytes());
                 }
-                Captured::Report(payload) => self.reporter.native_report(&payload),
+                Captured::Report(payload) => {
+                    if let Some(reporter) = &mut self.reporter {
+                        reporter.native_report(&payload);
+                    }
+                }
             }
         }
         let now = Instant::now();
@@ -89,7 +115,9 @@ impl Session {
 
     /// The PTY was resized.
     pub fn resize(&mut self, cols: u16, rows: u16) {
-        self.reporter.resize(cols, rows);
+        if let Some(reporter) = &mut self.reporter {
+            reporter.resize(cols, rows);
+        }
     }
 
     /// Re-evaluates the agent's status and appends any changed record to `to_terminal`. Call it
@@ -100,9 +128,11 @@ impl Session {
         }
         if self.dirty || now >= self.next_tick {
             self.dirty = false;
-            self.reporter.evaluate(now, &mut self.pending);
+            if let Some(reporter) = &mut self.reporter {
+                reporter.evaluate(now, &mut self.pending);
+            }
             let active = now.duration_since(self.last_activity) < ACTIVE_WINDOW
-                || self.reporter.current_state() == OscState::Working;
+                || self.state() == OscState::Working;
             self.next_tick = now + if active { TICK_INTERVAL } else { IDLE_TICK_INTERVAL };
         }
         if !self.pending.is_empty() && self.stream.at_boundary() {
@@ -116,9 +146,11 @@ impl Session {
         deadline.max(now)
     }
 
-    /// The state last reported to the terminal.
+    /// The state last reported to the terminal (`idle` for a [`Session::probe_only`] session).
     pub fn state(&self) -> OscState {
-        self.reporter.current_state()
+        self.reporter
+            .as_ref()
+            .map_or(OscState::Idle, Reporter::current_state)
     }
 
     /// The agent exited with `exit_code` (128 + signal for a signal). Appends the final records:
@@ -129,7 +161,9 @@ impl Session {
             to_terminal.push(0x18);
         }
         to_terminal.append(&mut self.pending);
-        self.reporter.finish(exit_code, to_terminal);
+        if let Some(reporter) = self.reporter {
+            reporter.finish(exit_code, to_terminal);
+        }
     }
 }
 
