@@ -1,6 +1,6 @@
 [package]
 name = "w1"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Wrap7501: makes TUI coding agents (Codex, OpenCode, Gemini, Copilot, ...) report status over OSC 7501"
 license = "MIT OR Apache-2.0"
@@ -19,3 +19,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 toml = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

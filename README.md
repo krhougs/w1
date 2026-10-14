@@ -78,7 +78,7 @@ Mode:
 | Claude Code | `claude` | Passthrough (≥ 2.1.295) | — | — | native | native | native | native | real CLI |
 | Pi | `pi` | Passthrough (≥ 1.1.0) | — | — | native | native | native | native | — |
 | omp (oh-my-pi) | `omp` | Merge: native reports state only. It never sends `working`, and its OSC 0 title carries an ~80 ms spinner | `$PI_CODING_AGENT_DIR/sessions/<cwd-slug>/*.jsonl` (default `~/.omp/agent`) | cwd + submit time | assistant `stop`/`end_turn`, `error`, `aborted` | screen + native | `todo_hud_state` | `title` / `title_change`. Spinner and status glyph are stripped from the forwarded title | real CLI |
-| OpenAI Codex | `codex`, `npx @openai/codex` | Wrap | `$CODEX_HOME/state_5.sqlite` `threads` → `sessions/**/rollout-*.jsonl` | Thread prompt time matches a submit in this terminal, or the first user message equals an argv element | `task_complete`, `error`, `turn_aborted` | screen (approval dialog shows `$ cmd`); `request_user_input` → question | `update_plan` | thread title | real CLI 0.162 |
+| OpenAI Codex | `codex`, `npx @openai/codex` | Wrap | `$CODEX_HOME/state_5.sqlite` `threads` → `sessions/**/rollout-*.jsonl` | Thread prompt time matches a submit in this terminal, or the first user message equals an argv element | `task_complete`, `error`, `turn_aborted` | screen (approval dialog shows `$ cmd`); `request_user_input` → question | `update_plan` | Thread `name`, else first prompt. Codex's own OSC 0/2 title (just the directory name) is dropped | real CLI 0.162 |
 | OpenCode | `opencode` | Wrap | `$XDG_DATA_HOME/opencode/opencode.db` (`session`/`message`/`part`/`todo`) | Root session created right after our submit; `--session` | Latest message `finish`; a rejected permission counts as idle | screen (`$ cmd`); `question` tool → question | `todo` table | session title | real CLI 1.17 |
 | Kilo Code | `kilo` | Wrap | Same schema as OpenCode under `kilo/kilo.db` | as OpenCode | as OpenCode | as OpenCode | as OpenCode | as OpenCode | **not tested** (path assumed) |
 | Gemini CLI | `gemini` | Wrap | `$GEMINI_CLI_HOME/.gemini/tmp/<project>/chats/session-*.jsonl` | `projectHash` + submit time | Screen only: the store has no turn-end record. Errors come from the store | screen | `write_todos` | `update_topic`, else first prompt | isolated HOME + mock API, 0.46 |
@@ -106,7 +106,8 @@ Behaviour that applies to every agent:
   cannot override a new turn the user has just started.
 - **OSC 9;4.** State `3` (indeterminate) means working. It does not mean blocked.
 - **Title filtering.** Braille spinner frames are stripped from the OSC 0/1/2 titles of every
-  known agent, and repeated titles are not re-sent. State detection still sees the raw title.
+  known agent, and repeated titles are not re-sent. Codex's OSC 0/1/2 titles are dropped
+  entirely, so the session title only comes from OSC 7501. State detection still sees the raw title.
 
 ## Project layout
 

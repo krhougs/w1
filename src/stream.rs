@@ -18,6 +18,8 @@ pub enum TitleFilter {
     Despin,
     /// omp: `π <status glyph> <label>`, where the glyph animates while working.
     Omp,
+    /// Codex: its titles name the directory rather than the session, so none are forwarded.
+    Drop,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,6 +101,7 @@ impl OutputStream {
                 out.append(&mut self.held);
                 self.state = State::Str;
             }
+            State::Title(_) | State::TitleEsc(_) if self.titles == TitleFilter::Drop => {}
             State::Title(_) => {
                 self.release_title(out);
                 self.state = State::Str;
@@ -113,7 +116,11 @@ impl OutputStream {
     }
 
     pub fn stalled_in_osc_head(&self) -> bool {
-        matches!(self.state, State::OscHead | State::Title(_) | State::TitleEsc(_))
+        match self.state {
+            State::OscHead => true,
+            State::Title(_) | State::TitleEsc(_) => self.titles != TitleFilter::Drop,
+            _ => false,
+        }
     }
 
     /// Whether the child sent RIS (`ESC c`), which wipes the outer terminal's status table.
@@ -254,6 +261,7 @@ impl OutputStream {
                     self.forward_to(b, out, State::Ground);
                 }
                 _ if self.payload.len() < MAX_TITLE_BYTES => self.payload.push(b),
+                _ if self.titles == TitleFilter::Drop => {}
                 _ => {
                     self.release_title(out);
                     self.forward_to(b, out, State::Str);
@@ -297,12 +305,21 @@ impl OutputStream {
 
     /// Forwards a held title sequence unchanged.
     fn release_title(&mut self, out: &mut Vec<u8>) {
+        if self.titles == TitleFilter::Drop {
+            self.held.clear();
+            self.payload.clear();
+            return;
+        }
         out.append(&mut self.held);
         out.append(&mut self.payload);
     }
 
     fn finish_title(&mut self, kind: u8, term: Terminator, out: &mut Vec<u8>) {
         self.state = State::Ground;
+        if self.titles == TitleFilter::Drop {
+            self.release_title(out);
+            return;
+        }
         let Some(title) = std::str::from_utf8(&self.payload)
             .ok()
             .map(|t| normalize_title(self.titles, t))

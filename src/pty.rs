@@ -213,6 +213,7 @@ impl PtyWrapper {
 
         let titles = match target.agent {
             Some(AgentKind::Omp) => TitleFilter::Omp,
+            Some(AgentKind::Codex) => TitleFilter::Drop,
             Some(_) => TitleFilter::Despin,
             None => TitleFilter::Off,
         };
