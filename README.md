@@ -31,7 +31,7 @@ hint, runs them directly, and prints the hint again when they exit.
 ## Install
 
 ```sh
-cargo install --path .
+cargo install w1
 ```
 
 Requirements:
@@ -209,3 +209,7 @@ when the agent writes a local session store, to get turn ends, summaries, titles
 
   Report how you verified the change: which agent version, and whether you used a real account
   or a mock. Cover each of permission, question, done, error, and cancel.
+
+## License
+
+Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

@@ -565,6 +565,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "w1"
+version = "0.1.0"
+dependencies = [
+ "alacritty_terminal",
+ "base64",
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "toml",
+]
+
+[[package]]
 name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,20 +673,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "wrap7501"
-version = "0.1.0"
-dependencies = [
- "alacritty_terminal",
- "base64",
- "libc",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "toml",
 ]
 
 [[package]]

@@ -1,12 +1,14 @@
 [package]
-name = "wrap7501"
+name = "w1"
 version = "0.1.0"
 edition = "2021"
-description = "OSC 7501 (Program Status Protocol) PTY wrapper for TUI coding agents"
-
-[[bin]]
-name = "w1"
-path = "src/main.rs"
+description = "Wrap7501: makes TUI coding agents (Codex, OpenCode, Gemini, Copilot, ...) report status over OSC 7501"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/krhougs/w1"
+readme = "README.md"
+keywords = ["osc7501", "terminal", "pty", "coding-agent", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = ["AGENTS.md", ".gitignore"]
 
 [dependencies]
 alacritty_terminal = "=0.26.0"
