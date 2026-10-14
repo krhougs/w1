@@ -1,6 +1,6 @@
 [package]
 name = "w1"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Wrap7501: makes TUI coding agents (Codex, OpenCode, Gemini, Copilot, ...) report status over OSC 7501"
 license = "MIT OR Apache-2.0"
