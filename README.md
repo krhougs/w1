@@ -30,14 +30,51 @@ hint, runs them directly, and prints the hint again when they exit.
 
 ## Install
 
+### Requirements
+
+- macOS or another Unix. Only macOS has been tested.
+- A Rust toolchain. If you don't have one, install it with [rustup](https://rustup.rs):
+
+  ```sh
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  ```
+
+- `sqlite3` on `PATH`. `w1` reads agents' SQLite stores through `sqlite3 -readonly`.
+  - macOS ships it.
+  - Debian/Ubuntu: `sudo apt install sqlite3`.
+  - Fedora: `sudo dnf install sqlite`.
+
+### From crates.io
+
 ```sh
 cargo install w1
 ```
 
-Requirements:
+This puts the `w1` binary in `~/.cargo/bin`, which must be on your `PATH` (rustup adds it
+by default). Check the install:
 
-- macOS or another Unix. Only macOS has been tested.
-- `sqlite3` on `PATH`. SQLite stores are read through `sqlite3 -readonly`.
+```sh
+w1 --version
+w1 --list-agents
+```
+
+### From source
+
+```sh
+cargo install --git https://github.com/krhougs/w1
+# or, from a local checkout
+git clone https://github.com/krhougs/w1 && cd w1 && cargo install --path .
+```
+
+### Upgrade and uninstall
+
+```sh
+cargo install w1      # installs the latest release over the old one
+cargo uninstall w1
+```
+
+`w1` keeps no state of its own. The only thing it writes is session claim locks, in
+`$TMPDIR/wrap7501-<uid>/`, and it is safe to delete that directory.
 
 ## Usage
 
