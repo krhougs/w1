@@ -184,7 +184,7 @@ spawning the `w1` binary.
 
 ```toml
 [dependencies]
-w1 = "0.3"
+w1 = "0.4"
 ```
 
 - `ResolvedTarget::resolve(program, args)` identifies the agent from its command line.
@@ -205,8 +205,9 @@ w1 = "0.3"
 - `run_target(target, RunOptions)` runs the full `w1` behaviour (passthrough, probe answering,
   or PTY wrapping) on the current process's terminal. `RunOptions::from_env()` applies
   `W1_NO_PROBE_ANSWER`. `detect_multiplexer()` reports the multiplexer `w1` detected.
-- `osc7501` encodes and parses OSC 7501 records. `agents`, `detect`, `inspect` and `stream`
-  expose the lower layers.
+- `osc7501` encodes and parses OSC 7501 records. `AgentKind::ALL` lists the recognised agents
+  with their `app_id()`, `display_name()`, `native_support()` and `summary()`. Since 0.4 the
+  lower layers (screen rules, session-store trackers) are internal.
 
 ```rust
 use std::time::Instant;
@@ -226,64 +227,85 @@ session.finish(exit_code, &mut to_terminal);
 
 ## Project layout
 
-| File | Role |
-|---|---|
-| `src/main.rs` | CLI parsing, `--list-agents` notes |
-| `src/lib.rs` | Library root and re-exports |
-| `src/session.rs` | `Session`: the embeddable engine between an agent's PTY and the terminal |
-| `src/agents.rs` | `AgentKind`: command → agent identification, OSC `app` id, native support level |
-| `src/pty.rs` | The `w1` PTY: spawn, I/O loop driving a `Session`, signal and resize forwarding, passthrough mode |
-| `src/stream.rs` | Splits the child's output: captures OSC 7501 reports and probes, filters titles |
-| `src/screen.rs` | Virtual terminal (alacritty) and prompt marks |
-| `src/detect.rs` | Per-agent screen rule manifests (TOML), message extraction, state stabiliser |
-| `src/inspect/mod.rs` | `Tracker` trait, `LaunchContext` (cwd, launch time, submits, resume), session claims, shared helpers |
-| `src/inspect/<agent>.rs` | One session-store tracker per agent |
-| `src/report.rs` | Merges screen, store and native reports into the records sent to the terminal |
-| `src/osc7501.rs` | OSC 7501 encoding, parsing, emitter |
+```
+src/
+├── main.rs              CLI, --list-agents
+├── lib.rs               library root and re-exports
+├── session.rs           Session: the embeddable engine between an agent's PTY and the terminal
+├── pty.rs               the w1 PTY: spawn, I/O loop, signal and resize forwarding, passthrough
+├── stream.rs            splits the child's output: OSC 7501 reports and probes, title filtering
+├── osc7501.rs           OSC 7501 encoding, parsing, emitter
+├── procs.rs             process tree
+├── engine/              status derivation; nothing here names an agent
+│   ├── rules.rs         screen rule DSL: parsing, matching, blocked kind
+│   ├── regions.rs       the screen regions a rule can match against
+│   ├── message.rs       summaries (msg) read from the screen
+│   ├── stabilizer.rs    screen detections → states without flicker
+│   ├── screen.rs        virtual terminal (alacritty) and prompt marks
+│   ├── store.rs         what trackers share: Tracker, LaunchContext, ExternalInsight, claims, helpers
+│   └── report.rs        merges screen, store and native reports into the records sent out
+└── agents/
+    ├── mod.rs           AgentKind, the profile registry, command → agent identification
+    ├── profile.rs       AgentProfile: everything an agent can declare
+    ├── generic.toml     screen rules for unknown programs
+    └── <agent>/
+        ├── mod.rs       the agent's PROFILE and hooks
+        ├── rules.toml   its screen rules
+        └── tracker.rs   its session-store tracker (when it has one)
+```
+
+Everything `w1` knows about one agent lives in its directory. The engine reads agent
+differences only from the agent's `AgentProfile`.
 
 ## Contributing: adding a new agent
 
 There are two levels of support. Screen rules alone give state and blocked kind. Add a tracker
 when the agent writes a local session store, to get turn ends, summaries, titles, and progress.
 
-### 1. Identify the agent (`src/agents.rs`)
+### 1. Profile (`src/agents/<agent>/mod.rs`)
 
-- Add a variant to `AgentKind` and to `AgentKind::ALL`.
-- Fill in `app_id()` (the OSC 7501 `app`, `[A-Za-z0-9_.+-]{1,32}`), `display_name()` and
-  `manifest_id()`.
-- Map its executable names in `lookup_agent_name()`. If it is often launched as an npm package
-  or through `node`/`bunx`, also add the package path to `lookup_from_package_path()`.
-- Set `native_support()`:
-  - `Full`: the agent reports everything itself. It is passed through untouched.
-  - `Partial`: it reports some OSC 7501. It is wrapped and merged.
-  - `None`: it is wrapped.
+- Create `src/agents/<agent>/` and declare `pub(crate) const PROFILE: AgentProfile`. Copy an
+  existing one: `kiro` has screen rules only, `copilot` also has a tracker.
+- Set `app_id` (the OSC 7501 `app`, `[A-Za-z0-9_.+-]{1,32}`), `display_name`, `commands` (its
+  executable names) and `rules`. Everything else defaults through `..AgentProfile::DEFAULTS`;
+  `src/agents/profile.rs` documents each field:
+  - `install_paths`, if it is often launched as an npm package or through `node`/`bunx`;
+  - `native`, using the **latest** release as the reference:
+    - `Full`: the agent reports everything itself. It is passed through untouched.
+    - `Partial`: it reports some OSC 7501. It is wrapped and merged.
+    - `None`: it is wrapped.
+  - `native_quirks`, when its own reports cannot be taken at face value;
+  - `titles`, `resume`, `tracker`, `hooks`;
+  - `summary`, its line in `--list-agents`.
+- Register it in `src/agents/mod.rs`: add a variant to `AgentKind` and to `AgentKind::ALL`, a
+  `mod <agent>;`, and a line in `AgentKind::profile()`. That match has no fallback, so a missing
+  line does not compile.
 
-  Use the **latest** release of the agent as the reference.
+### 2. Screen rules (`src/agents/<agent>/rules.toml`)
 
-### 2. Screen rules (`src/detect.rs`)
-
-- Write a `MANIFEST_<AGENT>` TOML string and register it in `BUNDLED_MANIFESTS` under the
-  `manifest_id`.
 - Each `[[rules]]` entry has:
   - `id`;
   - `state`: `idle`/`working`/`blocked`/`unknown`;
   - `priority`: the highest matching rule wins;
-  - `region`, for example `bottom_non_empty_lines(16)`, `osc_title`, `above_prompt_box`;
+  - `region`, for example `bottom_non_empty_lines(16)`, `osc_title`, `above_prompt_box`
+    (`src/engine/regions.rs` lists them all);
   - matchers: `contains` (lower-cased), `regex`, `line_regex`, and nested `all`/`any`/`not` gates;
   - `visible_*` flags.
 - Prefer stable affordances such as "esc to interrupt", the approval dialog's key hints, and
-  login prompts. Avoid model output. Copy an existing manifest as a starting point (the Copilot
-  and Crush ones are short).
-- If the blocked kind cannot be inferred from the rule id (`permission`/`question`/`auth`),
-  extend `classify_blocked_kind()`.
-- If the agent's footer or status line leaks into summaries, add the pattern to
-  `is_footer_hint_line()` or `ACTIVITY_NOISE`.
+  login prompts. Avoid model output. Copy an existing `rules.toml` as a starting point (the
+  Copilot and Crush ones are short). `cargo test` checks that every rules file compiles.
+- The blocked kind comes from the rule id (`permission`/`question`/`auth`, `login`, `trust`, …).
+  If it cannot, extend `classify_blocked_kind()` in `src/engine/rules.rs`.
+- Summaries (`msg`) come from shared heuristics in `src/engine/message.rs`. If the agent's
+  footer or status line leaks into them, add the pattern to `is_footer_hint_line()` or
+  `ACTIVITY_NOISE`. A summary only this agent's screen needs goes into `hooks` in its
+  `mod.rs` instead.
 
-### 3. Session-store tracker (`src/inspect/<agent>.rs`, optional)
+### 3. Session-store tracker (`src/agents/<agent>/tracker.rs`, optional)
 
-- Implement `Tracker::poll(&mut self, ctx: &LaunchContext, insight: &mut ExternalInsight)`. It
-  is called every 500 ms. Throttle directory scans yourself (about 1 s), and read files
-  incrementally with `JsonlTail` or SQLite through `sqlite_rows()`.
+- Implement `Tracker::poll(&mut self, ctx: &LaunchContext, insight: &mut ExternalInsight)` (from
+  `crate::engine::store`). It is called every 500 ms. Throttle directory scans yourself (about
+  1 s), and read files incrementally with `JsonlTail` or SQLite through `sqlite_rows()`.
 - **Claim the right session.** Prefer, in this order:
   1. A pid link: a lock or registry file holding a pid equal to, or descended from,
      `ctx.child_pid` (`procs::is_descendant_of`).
@@ -305,10 +327,9 @@ when the agent writes a local session store, to get turn ends, summaries, titles
   - `title`.
 
   Pass all text through `clean_text_summary()`.
-- Register the tracker in `SessionInspector::new()` (`src/inspect/mod.rs`), and add the agent's
-  resume flags to `is_resume_invocation()`.
-- Add a one-line note for the agent in `print_agents()` (`src/main.rs`), and a row to the table
-  above.
+- In the profile, set `tracker: Some(|| Box::new(tracker::<Agent>Tracker::default()))` and the
+  agent's `resume` flags.
+- Add a row to the table above.
 
 ### 4. Rules
 

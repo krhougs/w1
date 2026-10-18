@@ -1,0 +1,50 @@
+[[rules]]
+id = "workspace_trust_prompt"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(10)"
+visible_blocker = true
+contains = ["do you trust the authors of this directory?"]
+
+[[rules]]
+id = "permission_prompt"
+state = "blocked"
+priority = 290
+region = "bottom_non_empty_lines(12)"
+visible_blocker = true
+contains = ["approve once", "confirm", "esc cancel"]
+
+[[rules]]
+id = "question_prompt"
+state = "blocked"
+priority = 280
+region = "bottom_non_empty_lines(4)"
+visible_blocker = true
+contains = ["select", "confirm", "esc cancel"]
+not = [{ contains = ["approve once"] }]
+
+[[rules]]
+id = "interruptible_working"
+state = "working"
+priority = 200
+region = "bottom_non_empty_lines(10)"
+visible_working = true
+any = [
+  { contains = ["esc twice to interrupt"] },
+  { contains = ["esc to interrupt"] },
+  { contains = ["guide devin while it works"] },
+]
+
+[[rules]]
+id = "prompt_idle"
+state = "idle"
+priority = 100
+region = "bottom_non_empty_lines(8)"
+visible_idle = true
+line_regex = ['^\s*❭ ']
+not = [
+  { contains = ["esc twice to interrupt"] },
+  { contains = ["guide devin while it works"] },
+  { contains = ["esc cancel"] },
+  { contains = ["esc to quit"] },
+]

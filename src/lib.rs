@@ -30,18 +30,15 @@
 //! # let _ = next_deadline;
 //! ```
 
-pub mod agents;
-pub mod detect;
-pub mod inspect;
+mod agents;
+mod engine;
 pub mod osc7501;
 mod procs;
-pub mod pty;
-pub mod report;
-pub mod screen;
-pub mod session;
-pub mod stream;
+mod pty;
+mod session;
+mod stream;
 
 pub use agents::{AgentKind, NativeSupport, ResolvedTarget};
 pub use osc7501::{BlockedKind, OscRecord, OscState};
-pub use pty::{detect_multiplexer, run_target, RunOptions};
+pub use pty::{detect_multiplexer, run_target, RunOptions, NO_PROBE_ANSWER_ENV};
 pub use session::Session;

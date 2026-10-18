@@ -1,0 +1,42 @@
+[[rules]]
+id = "osc_title_blocked"
+state = "blocked"
+priority = 1100
+region = "osc_title"
+visible_blocker = true
+contains = ["Action Required"]
+
+[[rules]]
+id = "osc_title_working"
+state = "working"
+priority = 1000
+region = "osc_title"
+visible_working = true
+regex = ['(?:^|\s)[\x{2801}-\x{28FF}](?:\s|$)']
+
+[[rules]]
+id = "generic_permission"
+state = "blocked"
+priority = 400
+region = "bottom_non_empty_lines(12)"
+visible_blocker = true
+any = [
+  { contains = ["do you want to proceed?"] },
+  { contains = ["allow execution"] },
+  { contains = ["permission required"] },
+  { contains = ["waiting for approval"] },
+  { contains = ["press enter to confirm or esc to cancel"] },
+]
+
+[[rules]]
+id = "generic_working"
+state = "working"
+priority = 200
+region = "bottom_non_empty_lines(10)"
+visible_working = true
+any = [
+  { contains = ["esc to interrupt"] },
+  { contains = ["esc to cancel"] },
+  { contains = ["ctrl+c to stop"] },
+  { contains = ["ctrl+c to interrupt"] },
+]

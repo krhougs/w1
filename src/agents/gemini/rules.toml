@@ -1,0 +1,56 @@
+[[rules]]
+id = "osc_title_blocked"
+state = "blocked"
+priority = 1100
+region = "osc_title"
+visible_blocker = true
+contains = ["Action Required"]
+
+[[rules]]
+id = "osc_title_working"
+state = "working"
+priority = 1050
+region = "osc_title"
+visible_working = true
+any = [
+  { regex = ['^[✦⏲]'] },
+  { contains = ["Working…"] },
+]
+
+[[rules]]
+id = "apply_or_allow_change"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(20)"
+visible_blocker = true
+any = [
+  { contains = ["│ Apply this change"] },
+  { contains = ["│ Allow execution"] },
+  { all = [{ contains = ["yes"] }, { any = [{ contains = ["waiting for user confirmation"] }, { contains = ["│ Do you want to proceed"] }, { contains = ["do you want to proceed?"] }] }] },
+  { line_regex = ['(?i)^\s*❯.*(yes|allow)'] },
+]
+
+[[rules]]
+id = "answer_questions"
+state = "blocked"
+priority = 310
+region = "bottom_non_empty_lines(24)"
+visible_blocker = true
+contains = ["Answer Questions"]
+any = [{ contains = ["Enter to select"] }, { contains = ["Esc to cancel"] }]
+
+[[rules]]
+id = "esc_cancel_working"
+state = "working"
+priority = 100
+region = "bottom_non_empty_lines(12)"
+visible_working = true
+contains = ["esc to cancel"]
+
+[[rules]]
+id = "osc_title_idle"
+state = "idle"
+priority = 80
+region = "osc_title"
+visible_idle = true
+regex = ['^◇\s+Ready']

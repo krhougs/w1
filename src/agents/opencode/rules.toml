@@ -1,0 +1,40 @@
+[[rules]]
+id = "permission_required"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(24)"
+visible_blocker = true
+contains = ["Permission required"]
+any = [
+  { contains = ["enter confirm"] },
+  { contains = ["Allow once"] },
+]
+
+[[rules]]
+id = "question_dialog"
+state = "blocked"
+priority = 290
+region = "bottom_non_empty_lines(24)"
+visible_blocker = true
+contains = ["esc dismiss"]
+any = [{ contains = ["enter submit"] }, { contains = ["enter toggle"] }]
+
+[[rules]]
+id = "interrupt_hint_working"
+state = "working"
+priority = 110
+region = "bottom_non_empty_lines(8)"
+visible_working = true
+any = [
+  { contains = ["esc interrupt"] },
+  { contains = ["esc again to interrupt"] },
+  { contains = ["esc to interrupt"] },
+]
+
+[[rules]]
+id = "progress_bar_working"
+state = "working"
+priority = 100
+region = "bottom_non_empty_lines(8)"
+visible_working = true
+regex = ['(■|⬝){4,}']

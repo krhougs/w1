@@ -1,0 +1,31 @@
+[[rules]]
+id = "tool_approval_blocked"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(10)"
+visible_blocker = true
+any = [
+  { contains = ["Allow Goose to"] },
+  { contains = ["Approve tool call"] },
+  { all = [{ contains = ["Allow"] }, { contains = ["Deny"] }, { any = [{ contains = ["Always allow"] }, { contains = ["Allow once"] }] }] },
+]
+
+[[rules]]
+id = "working_spinner"
+state = "working"
+priority = 200
+region = "bottom_non_empty_lines(8)"
+visible_working = true
+any = [
+  { line_regex = ['^\s*[\u2800-\u28FF]+\s+(?:Thinking|Working|Running|Generating|Calling)'] },
+  { contains = ["esc to interrupt"] },
+  { contains = ["ctrl+c to interrupt"] },
+]
+
+[[rules]]
+id = "goose_prompt_idle"
+state = "idle"
+priority = 100
+region = "bottom_non_empty_lines(4)"
+visible_idle = true
+line_regex = ['^\s*(?:O\)|\(>\)|goose>)\s*$']

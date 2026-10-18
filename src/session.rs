@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::agents::{AgentKind, ResolvedTarget};
 use crate::osc7501::OscState;
-use crate::report::Reporter;
+use crate::engine::report::Reporter;
 use crate::stream::{Captured, OutputStream, TitleFilter};
 
 /// Status refresh cadence while the agent is active, and once it has been quiet for a while.
@@ -168,12 +168,7 @@ impl Session {
 }
 
 fn title_filter(agent: Option<AgentKind>) -> TitleFilter {
-    match agent {
-        Some(AgentKind::Omp) => TitleFilter::Omp,
-        Some(AgentKind::Codex) => TitleFilter::Drop,
-        Some(_) => TitleFilter::Despin,
-        None => TitleFilter::Off,
-    }
+    agent.map_or(TitleFilter::Off, |a| a.profile().titles)
 }
 
 /// Enter in any keyboard encoding agents enable: plain CR/LF, kitty (`CSI 13 u`) or

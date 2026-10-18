@@ -72,7 +72,7 @@ Options:
   -h, --help         Show this help
   -V, --version      Show version",
         env!("CARGO_PKG_VERSION"),
-        w1::pty::NO_PROBE_ANSWER_ENV
+        w1::NO_PROBE_ANSWER_ENV
     );
 }
 
@@ -88,32 +88,12 @@ fn print_agents() {
             NativeSupport::Partial => "Native + w1",
             NativeSupport::None => "Wrapped",
         };
-        let note = match kind {
-            AgentKind::Claude => "Claude Code >= 2.1.295 supports OSC 7501 natively",
-            AgentKind::Pi => "Pi Coding Agent >= 1.1.0 supports OSC 7501 natively",
-            AgentKind::Omp => "Native state only; w1 adds working/title/summary/progress (session JSONL) and strips the title spinner",
-            AgentKind::Codex => "Screen + ~/.codex/state_5.sqlite threads (claimed by prompt time) + rollout JSONL",
-            AgentKind::Gemini => "Screen/OSC title + $GEMINI_CLI_HOME/.gemini/tmp/<project>/chats JSONL",
-            AgentKind::OpenCode => "Screen + ~/.local/share/opencode/opencode.db (sessions/messages/todos/subagents)",
-            AgentKind::Kilo => "Screen + ~/.local/share/kilo (same store as OpenCode; untested)",
-            AgentKind::Grok => "Native + w1: active_sessions.json (by pid) + events/updates JSONL",
-            AgentKind::Devin => "Screen + ~/.local/share/devin/cli sessions.db (session_locks by pid)",
-            AgentKind::Cursor => "Screen + ~/.cursor chats meta.json + agent-transcripts (turns untested)",
-            AgentKind::Antigravity => "Native (blocked only with a dialog on screen) + w1: agy log (by pid) + conversation databases",
-            AgentKind::Droid => "Native + w1: ~/.factory/sessions/<cwd> JSONL (title/summary/todos/errors)",
-            AgentKind::GithubCopilot => "Screen + ~/.copilot/session-state events.jsonl (inuse.<pid>.lock)",
-            AgentKind::Amp => "Native + w1: screen only (threads live server-side)",
-            AgentKind::Kimi => "Screen + $KIMI_CODE_HOME/sessions/wd_*/ state.json & wire.jsonl",
-            AgentKind::Qwen => "Screen/OSC title + ~/.qwen/sessions/<pid>.json + projects/*/chats JSONL",
-            AgentKind::Crush => "Native + w1: <data dir>/crush.db (title/summary/todos/errors)",
-            _ => "Screen + OSC 0/2/9 heuristics",
-        };
         println!(
             "{:<16} {:<22} {:<12} {}",
             kind.app_id(),
             kind.display_name(),
             mode,
-            note
+            kind.summary()
         );
     }
 }

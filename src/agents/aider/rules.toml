@@ -1,0 +1,32 @@
+[[rules]]
+id = "confirmation_prompt"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(6)"
+visible_blocker = true
+any = [
+  { line_regex = ['(?i)\((?:y\)es/\(n\)o|y/n)\)\s*\[[^\]]+\]:?\s*$'] },
+  { contains = ["Run shell command?"] },
+  { contains = ["Add ", "to the chat?"] },
+  { contains = ["Create new file?"] },
+  { contains = ["Allow creation of"] },
+]
+
+[[rules]]
+id = "waiting_llm_working"
+state = "working"
+priority = 200
+region = "bottom_non_empty_lines(6)"
+visible_working = true
+any = [
+  { contains = ["Waiting for "] },
+  { line_regex = ['^\s*[\u2800-\u28FF]+\s+\S'] },
+]
+
+[[rules]]
+id = "prompt_idle"
+state = "idle"
+priority = 100
+region = "bottom_non_empty_lines(3)"
+visible_idle = true
+line_regex = ['^(?:[a-zA-Z0-9_-]+\s+)?>\s*$']

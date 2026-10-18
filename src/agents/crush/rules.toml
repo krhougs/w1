@@ -1,0 +1,33 @@
+[[rules]]
+id = "permission_dialog"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(12)"
+visible_blocker = true
+any = [
+  { contains = ["Permission required"] },
+  { all = [{ contains = ["Allow"] }, { contains = ["Deny"] }, { contains = ["esc"] }] },
+]
+
+[[rules]]
+id = "question_dialog"
+state = "blocked"
+priority = 290
+region = "bottom_non_empty_lines(12)"
+visible_blocker = true
+contains = ["enter select", "quick select"]
+
+[[rules]]
+id = "working_hint"
+state = "working"
+priority = 200
+region = "bottom_non_empty_lines(8)"
+visible_working = true
+any = [
+  { contains = ["esc cancel"] },
+  { contains = ["press again to cancel"] },
+  { contains = ["esc to cancel"] },
+  { contains = ["esc to interrupt"] },
+  { line_regex = ['^\s*::: Working'] },
+  { line_regex = ['^\s*[\u2801-\u28FF]+\s+\S'] },
+]

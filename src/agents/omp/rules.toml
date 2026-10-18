@@ -1,0 +1,16 @@
+[[rules]]
+id = "osc_title_working"
+state = "working"
+priority = 200
+region = "osc_title"
+visible_working = true
+regex = ['(?:^|\s)[\x{2801}-\x{28FF}](?:\s|$)']
+
+[[rules]]
+id = "osc_title_idle"
+state = "idle"
+priority = 100
+region = "osc_title"
+visible_idle = true
+regex = ['\S']
+not = [{ regex = ['[\x{2801}-\x{28FF}]'] }]

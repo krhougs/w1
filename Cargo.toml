@@ -1,6 +1,6 @@
 [package]
 name = "w1"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Wrap7501: makes TUI coding agents (Codex, OpenCode, Gemini, Copilot, ...) report status over OSC 7501"
 license = "MIT OR Apache-2.0"
@@ -8,7 +8,7 @@ repository = "https://github.com/krhougs/w1"
 readme = "README.md"
 keywords = ["osc7501", "terminal", "pty", "coding-agent", "cli"]
 categories = ["command-line-utilities", "development-tools"]
-exclude = ["AGENTS.md", ".gitignore"]
+exclude = ["AGENTS.md", ".gitignore", "prompt-archives"]
 rust-version = "1.85"
 resolver = "3"
 

@@ -1,0 +1,71 @@
+[[rules]]
+id = "permission_prompt"
+state = "blocked"
+priority = 300
+region = "bottom_non_empty_lines(3)"
+visible_blocker = true
+contains = ["navigate", "tab amend"]
+
+[[rules]]
+id = "question_prompt"
+state = "blocked"
+priority = 290
+region = "bottom_non_empty_lines(3)"
+visible_blocker = true
+contains = ["navigate", "esc skip"]
+
+[[rules]]
+id = "trust_prompt"
+state = "blocked"
+priority = 280
+region = "bottom_non_empty_lines(8)"
+visible_blocker = true
+contains = ["do you trust the contents of this project?", "yes, i trust this folder"]
+
+[[rules]]
+id = "login_prompt"
+state = "blocked"
+priority = 275
+region = "bottom_non_empty_lines(8)"
+visible_blocker = true
+any = [
+  { contains = ["select login method"] },
+  { contains = ["paste the authorization code"] },
+]
+
+[[rules]]
+id = "legacy_permission_prompt"
+state = "blocked"
+priority = 270
+region = "whole_recent"
+visible_blocker = true
+contains = ["requesting permission for:"]
+any = [
+  { contains = ["do you want to proceed?"] },
+  { contains = ["tab amend", "edit command"] },
+]
+
+[[rules]]
+id = "esc_cancel_footer_working"
+state = "working"
+priority = 110
+region = "bottom_non_empty_lines(2)"
+visible_working = true
+regex = ['(?m)^\s*(?:─{3,}\s*)?esc to cancel\b']
+
+[[rules]]
+id = "spinner_working"
+state = "working"
+priority = 100
+region = "bottom_non_empty_lines(12)"
+visible_working = true
+line_regex = ['^\s*[\u2801-\u28FF]+\s+\S']
+not = [{ contains = ["signing in"] }]
+
+[[rules]]
+id = "prompt_idle"
+state = "idle"
+priority = 50
+region = "bottom_non_empty_lines(2)"
+visible_idle = true
+contains = ["? for shortcuts"]

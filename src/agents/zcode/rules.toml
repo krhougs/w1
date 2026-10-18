@@ -1,0 +1,31 @@
+[[rules]]
+id = "osc_progress_blocked"
+state = "blocked"
+priority = 1300
+region = "osc_progress"
+visible_blocker = true
+regex = ['^4;3(?:;|$)']
+
+[[rules]]
+id = "osc_title_working"
+state = "working"
+priority = 1100
+region = "osc_title"
+visible_working = true
+regex = ['^ZC \| [\x{2800}-\x{28FF}] ']
+
+[[rules]]
+id = "permission_blocked"
+state = "blocked"
+priority = 900
+region = "bottom_non_empty_lines(10)"
+visible_blocker = true
+contains = ["waiting for permission"]
+
+[[rules]]
+id = "composer_idle"
+state = "idle"
+priority = 100
+region = "bottom_non_empty_lines(6)"
+visible_idle = true
+contains = ["? for shortcuts"]
