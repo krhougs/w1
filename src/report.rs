@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use crate::agents::ResolvedTarget;
+use crate::agents::{AgentKind, ResolvedTarget};
 use crate::detect::{self, DetectedState, DetectionInput, StateStabilizer};
 use crate::inspect::{ExternalInsight, LaunchContext, SessionInspector, SubmitLog, POLL_INTERVAL};
 use crate::osc7501::{parse_report, BlockedKind, OscEmitter, OscRecord, OscState, ParsedReport};
@@ -18,7 +18,7 @@ const MAX_NATIVE_RECORDS: usize = 64;
 pub struct Reporter {
     app_id: String,
     display_name: String,
-    agent: Option<crate::agents::AgentKind>,
+    agent: Option<AgentKind>,
     screen_title_fallback: bool,
     screen: VirtualScreen,
     stabilizer: StateStabilizer,
@@ -26,6 +26,10 @@ pub struct Reporter {
     inspector: InspectorHandle,
     native_root: Option<OscRecord>,
     native_children: BTreeMap<String, OscRecord>,
+    /// A root record held back until it has stood for `NATIVE_SETTLE` (agy only).
+    native_pending: Option<(Instant, OscRecord)>,
+    /// Whether the dialog of agy's current native `blocked` has been on screen.
+    native_blocked_shown: bool,
     last_emit: Option<(Instant, OscState)>,
     mark_error: Option<String>,
     /// Last store state seen, and whether its turn-ending value still has to be applied. A
@@ -47,6 +51,10 @@ const STORE_CONFIRM_WAIT: std::time::Duration = std::time::Duration::from_secs(2
 
 /// Same-state refreshes (streaming text, spinner captions) are coalesced to this rate.
 const DETAIL_REFRESH: std::time::Duration = std::time::Duration::from_millis(400);
+
+/// agy reports `done` when a permission is declined and replaces it with `idle` a frame later.
+/// Its root records only count once they have stood this long.
+const NATIVE_SETTLE: std::time::Duration = std::time::Duration::from_millis(300);
 
 impl Reporter {
     pub fn new(
@@ -71,6 +79,8 @@ impl Reporter {
             inspector: InspectorHandle::spawn(inspector),
             native_root: None,
             native_children: BTreeMap::new(),
+            native_pending: None,
+            native_blocked_shown: false,
             last_emit: None,
             mark_error: None,
             ext_seen: None,
@@ -131,7 +141,9 @@ impl Reporter {
     pub fn native_report(&mut self, payload: &str) {
         match parse_report(payload) {
             Some(ParsedReport::Record { id, record }) => {
-                if id.is_empty() {
+                if id.is_empty() && self.agent == Some(AgentKind::Antigravity) {
+                    self.native_pending = Some((Instant::now(), record));
+                } else if id.is_empty() {
                     self.native_root = Some(record);
                 } else if self.native_children.contains_key(&id)
                     || self.native_children.len() < MAX_NATIVE_RECORDS
@@ -142,6 +154,7 @@ impl Reporter {
             Some(ParsedReport::Clear { id }) => {
                 if id.is_empty() {
                     self.native_root = None;
+                    self.native_pending = None;
                     self.native_children.clear();
                 } else {
                     let prefix = format!("{id}/");
@@ -235,6 +248,15 @@ impl Reporter {
     }
 
     fn compose_root(&mut self, insight: &ExternalInsight, now: Instant) -> OscRecord {
+        if let Some((_, record)) = self
+            .native_pending
+            .take_if(|(at, _)| now.duration_since(*at) >= NATIVE_SETTLE)
+        {
+            if self.native_root.as_ref() != Some(&record) {
+                self.native_blocked_shown = false;
+            }
+            self.native_root = Some(record);
+        }
         let viewport = self.screen.viewport_text();
         let det = detect::detect(
             self.agent,
@@ -325,7 +347,21 @@ impl Reporter {
         };
         let mut app = None;
 
-        if let Some(native) = self.native_root.clone() {
+        // agy reports `blocked` with no dialog on screen: `auth` while it signs in at startup, and
+        // `Approve plan` from the moment it writes an artifact until the next prompt, even after
+        // the turn has ended. Its `blocked` counts once the dialog has been on screen, until the
+        // record changes or the prompt is back (redraws between dialogs must not drop it).
+        if det.state == DetectedState::Blocked {
+            self.native_blocked_shown = true;
+        } else if det.visible_idle {
+            self.native_blocked_shown = false;
+        }
+        let native = self.native_root.clone().filter(|n| {
+            n.state != OscState::Blocked
+                || self.native_blocked_shown
+                || self.agent != Some(AgentKind::Antigravity)
+        });
+        if let Some(native) = native {
             // The child's own report is authoritative for blocked/error and anything it fills in;
             // w1 only completes missing fields and the working phase the child does not report.
             // Natively reporting agents so far miss turn starts or errors (reporting `idle`

@@ -99,7 +99,7 @@ fn print_agents() {
             AgentKind::Grok => "Native + w1: active_sessions.json (by pid) + events/updates JSONL",
             AgentKind::Devin => "Screen + ~/.local/share/devin/cli sessions.db (session_locks by pid)",
             AgentKind::Cursor => "Screen + ~/.cursor chats meta.json + agent-transcripts (turns untested)",
-            AgentKind::Antigravity => "Screen + agy log (by pid) + conversation databases",
+            AgentKind::Antigravity => "Native (blocked only with a dialog on screen) + w1: agy log (by pid) + conversation databases",
             AgentKind::Droid => "Native + w1: ~/.factory/sessions/<cwd> JSONL (title/summary/todos/errors)",
             AgentKind::GithubCopilot => "Screen + ~/.copilot/session-state events.jsonl (inuse.<pid>.lock)",
             AgentKind::Amp => "Native + w1: screen only (threads live server-side)",

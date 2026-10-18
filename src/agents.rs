@@ -78,7 +78,7 @@ impl AgentKind {
             Self::OpenCode => "opencode",
             Self::Cursor => "cursor",
             Self::Devin => "devin",
-            Self::Antigravity => "agy",
+            Self::Antigravity => "antigravity",
             Self::Cline => "cline",
             Self::Mastracode => "mastracode",
             Self::GithubCopilot => "copilot",
@@ -176,8 +176,14 @@ impl AgentKind {
             // omp reports state only: no `title`, no turn summary, and the working indicator lives
             // in its OSC 0 title spinner. Grok Build >= 1.0.52 reports natively but stays silent
             // inside tmux. Crush (>= 0.98), Droid (>= 0.236) and Amp report state/kind only.
-            // `w1` wraps them, answers their probe and completes the records.
-            Self::Omp | Self::Grok | Self::Crush | Self::Droid | Self::Amp => NativeSupport::Partial,
+            // agy (>= 1.4.0) reports no title, and `blocked` with no dialog on screen. `w1` wraps
+            // them, answers their probe and completes the records.
+            Self::Omp
+            | Self::Grok
+            | Self::Crush
+            | Self::Droid
+            | Self::Amp
+            | Self::Antigravity => NativeSupport::Partial,
             _ => NativeSupport::None,
         }
     }

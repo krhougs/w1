@@ -397,6 +397,9 @@ fn extract_blocked_message(
     if rule_id.contains("startup_update") {
         return Some("Update prompt waiting for confirmation".to_owned());
     }
+    if rule_id == "login_prompt" {
+        return Some("Sign in required".to_owned());
+    }
 
     // agy: `Requesting permission for:` followed by the indented command.
     if let Some(cmd) = lines
@@ -1500,6 +1503,17 @@ priority = 280
 region = "bottom_non_empty_lines(8)"
 visible_blocker = true
 contains = ["do you trust the contents of this project?", "yes, i trust this folder"]
+
+[[rules]]
+id = "login_prompt"
+state = "blocked"
+priority = 275
+region = "bottom_non_empty_lines(8)"
+visible_blocker = true
+any = [
+  { contains = ["select login method"] },
+  { contains = ["paste the authorization code"] },
+]
 
 [[rules]]
 id = "legacy_permission_prompt"
