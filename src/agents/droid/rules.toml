@@ -1,4 +1,13 @@
 [[rules]]
+id = "login_required"
+msg = "Sign in required"
+state = "blocked"
+priority = 330
+region = "bottom_non_empty_lines(8)"
+visible_blocker = true
+contains = ["please login with your factory account"]
+
+[[rules]]
 id = "ask_user_question"
 state = "blocked"
 priority = 320

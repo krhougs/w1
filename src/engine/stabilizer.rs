@@ -64,6 +64,9 @@ impl StateStabilizer {
                 self.current = OscState::Blocked;
             }
             DetectedState::Working => {
+                if detection.turn_only && !self.armed && !self.turn_active {
+                    return self.current;
+                }
                 self.reset_pending();
                 if self.armed {
                     self.armed = false;

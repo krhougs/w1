@@ -65,12 +65,15 @@ pub(crate) struct NativeQuirks {
     /// A native `blocked` only counts once its dialog has been on screen, until the record
     /// changes or the idle prompt is back.
     pub blocked_needs_screen: bool,
+    /// Reports `idle` where a turn finished, so its `idle` does not undo a `done` w1 saw.
+    pub idle_for_done: bool,
 }
 
 impl NativeQuirks {
     pub const NONE: Self = Self {
         settle: None,
         blocked_needs_screen: false,
+        idle_for_done: false,
     };
 }
 

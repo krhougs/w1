@@ -18,6 +18,7 @@ pub(crate) const PROFILE: AgentProfile = AgentProfile {
         // and `Approve plan` from the moment it writes an artifact until the next prompt, even
         // after the turn has ended.
         blocked_needs_screen: true,
+        ..NativeQuirks::NONE
     },
     rules: include_str!("rules.toml"),
     resume: Resume::flags(&["--continue", "-c", "--conversation"]),

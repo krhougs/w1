@@ -17,10 +17,18 @@ regex = ['^ZC \| [\x{2800}-\x{28FF}] ']
 [[rules]]
 id = "permission_blocked"
 state = "blocked"
-priority = 900
+priority = 1200
 region = "bottom_non_empty_lines(10)"
 visible_blocker = true
 contains = ["waiting for permission"]
+
+[[rules]]
+id = "permission_panel"
+state = "blocked"
+priority = 1200
+region = "bottom_non_empty_lines(16)"
+visible_blocker = true
+contains = ["permission · ", "allow once"]
 
 [[rules]]
 id = "composer_idle"

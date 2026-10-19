@@ -1,4 +1,12 @@
 [[rules]]
+id = "permission_reject_reason"
+state = "blocked"
+priority = 310
+region = "bottom_non_empty_lines(12)"
+visible_blocker = true
+contains = ["reject permission", "tell kilo what to do differently"]
+
+[[rules]]
 id = "permission_required"
 state = "blocked"
 priority = 300

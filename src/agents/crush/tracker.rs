@@ -96,6 +96,14 @@ impl Tracker for CrushTracker {
                 insight.finish_turn(clean_text_summary(&text));
             }
             (Some("assistant"), Some("canceled" | "cancelled")) => insight.abort_turn(),
+            // A declined permission ends the turn at its tool result.
+            (Some("tool"), _)
+                if parts.iter().any(|p| {
+                    json_str(p, &["data", "content"]) == Some("User denied permission")
+                }) =>
+            {
+                insight.abort_turn()
+            }
             (Some("assistant"), Some("error")) => {
                 let msg = finish.and_then(|f| {
                     let head = json_str(f, &["message"]).unwrap_or("");

@@ -1,5 +1,6 @@
 [[rules]]
 id = "permission_dialog"
+msg = "Permission required"
 state = "blocked"
 priority = 300
 region = "bottom_non_empty_lines(12)"
@@ -8,6 +9,16 @@ any = [
   { contains = ["Permission required"] },
   { all = [{ contains = ["Allow"] }, { contains = ["Deny"] }, { contains = ["esc"] }] },
 ]
+
+# Fullscreen: a dialog above the bottom lines is still the current frame.
+[[rules]]
+id = "permission_dialog_full"
+msg = "Permission required"
+state = "blocked"
+priority = 300
+region = "whole_recent"
+visible_blocker = true
+contains = ["allow for session", "deny", "enter confirm"]
 
 [[rules]]
 id = "question_dialog"

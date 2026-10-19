@@ -94,3 +94,13 @@ priority = 100
 region = "osc_title"
 visible_idle = true
 regex = ['^✓[\u{fe0e}\u{fe0f}]?(?:\s|$)']
+
+# The classic REPL erases its prompt area and asks for the cursor position before redrawing it;
+# a frame without the prompt says nothing about the state.
+[[rules]]
+id = "redraw_gap"
+state = "unknown"
+priority = 10
+region = "bottom_non_empty_lines(3)"
+skip_state_update = true
+not = [{ contains = ["❯"] }]

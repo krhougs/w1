@@ -1,4 +1,12 @@
 [[rules]]
+id = "folder_trust"
+state = "blocked"
+priority = 410
+region = "bottom_non_empty_lines(16)"
+visible_blocker = true
+contains = ["trust this folder?", "trust and continue"]
+
+[[rules]]
 id = "current_approval_panel"
 state = "blocked"
 priority = 400

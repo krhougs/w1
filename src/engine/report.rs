@@ -34,9 +34,10 @@ pub struct Reporter {
     native_blocked_shown: bool,
     last_emit: Option<(Instant, OscState)>,
     mark_error: Option<String>,
-    /// Last store state seen, and whether its turn-ending value still has to be applied. A
-    /// store lags behind a fresh submit, so an old done/idle/error must not end the new turn.
-    ext_seen: Option<OscState>,
+    /// Last store state and turn seen, and whether its turn-ending value still has to be
+    /// applied. A store lags behind a fresh submit, so an old done/idle/error must not end the
+    /// new turn.
+    ext_seen: (Option<OscState>, u64),
     ext_end_pending: bool,
     submits: SubmitLog,
     has_tracker: bool,
@@ -84,7 +85,7 @@ impl Reporter {
             native_blocked_shown: false,
             last_emit: None,
             mark_error: None,
-            ext_seen: None,
+            ext_seen: (None, 0),
             ext_end_pending: false,
             submits,
             has_tracker: !screen_title_fallback,
@@ -270,8 +271,8 @@ impl Reporter {
         );
 
         let mut state = self.stabilizer.update(&det, now);
-        if insight.state != self.ext_seen {
-            self.ext_seen = insight.state;
+        if (insight.state, insight.turn) != self.ext_seen {
+            self.ext_seen = (insight.state, insight.turn);
             self.ext_end_pending = true;
         }
         if det.state == DetectedState::Blocked {
@@ -371,6 +372,9 @@ impl Reporter {
                 (OscState::Idle | OscState::Done, _) if det.state == DetectedState::Working => {
                     OscState::Working
                 }
+                (OscState::Idle, OscState::Done) if self.native_quirks.idle_for_done => state,
+                // The store recorded the turn as aborted or declined.
+                (OscState::Done, OscState::Idle) if insight.state == Some(OscState::Idle) => state,
                 (native_state, _) => native_state,
             };
             if merged_state != state {

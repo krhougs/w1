@@ -1,4 +1,24 @@
 [[rules]]
+id = "folder_trust"
+state = "blocked"
+priority = 1120
+region = "bottom_non_empty_lines(16)"
+visible_blocker = true
+contains = ["do you trust the files in this folder?", "trust folder"]
+
+[[rules]]
+id = "auth_dialog"
+msg = "Sign in required"
+state = "blocked"
+priority = 1120
+region = "bottom_non_empty_lines(20)"
+visible_blocker = true
+any = [
+  { contains = ["how would you like to authenticate"] },
+  { contains = ["waiting for authentication..."] },
+]
+
+[[rules]]
 id = "osc_title_blocked"
 state = "blocked"
 priority = 1100

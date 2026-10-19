@@ -1,4 +1,25 @@
 [[rules]]
+id = "folder_trust"
+state = "blocked"
+priority = 320
+region = "bottom_non_empty_lines(16)"
+visible_blocker = true
+contains = ["do you trust the files in this folder?", "trust folder"]
+
+[[rules]]
+id = "login_required"
+msg = "Sign in required"
+state = "blocked"
+priority = 320
+region = "bottom_non_empty_lines(16)"
+visible_blocker = true
+any = [
+  { contains = ["sign in to get started"] },
+  { contains = ["how would you like to authenticate"] },
+  { contains = ["waiting for authentication..."] },
+]
+
+[[rules]]
 id = "confirmation_or_input_blocker"
 state = "blocked"
 priority = 300

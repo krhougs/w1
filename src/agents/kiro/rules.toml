@@ -7,6 +7,15 @@ visible_idle = true
 line_regex = ['(?i)^\s*[>›]\s*ask a question or describe a task(?:\s+(?:enter|↵))?\s*$']
 
 [[rules]]
+id = "login_required"
+msg = "Sign in required"
+state = "blocked"
+priority = 1150
+region = "bottom_non_empty_lines(6)"
+visible_blocker = true
+contains = ["let's get you signed in", "continue to the browser"]
+
+[[rules]]
 id = "tool_approval"
 state = "blocked"
 priority = 1050

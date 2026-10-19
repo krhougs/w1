@@ -361,8 +361,8 @@ fn identify_token(token: &str) -> Option<AgentKind> {
     if trimmed.is_empty() || trimmed.starts_with('-') {
         return None;
     }
-    let without_version = trimmed.split('@').next().unwrap_or(trimmed);
-    let base = normalized_lookup_name(path_basename(without_version));
+    let name = path_basename(trimmed);
+    let base = normalized_lookup_name(name.split('@').next().unwrap_or(name));
     lookup_agent_name(&base).or_else(|| lookup_from_package_path(trimmed))
 }
 
@@ -518,9 +518,17 @@ mod tests {
             identify_from_command(&["node".into(), "/opt/homebrew/bin/gemini".into()], None),
             Some(AgentKind::Gemini)
         );
+        assert_eq!(
+            identify_from_command(
+                &["node".into(), "/opt/node_modules/@letta-ai/letta-code/letta.js".into()],
+                None
+            ),
+            Some(AgentKind::Letta)
+        );
         assert_eq!(AgentKind::Claude.native_support(), NativeSupport::Full);
         assert_eq!(AgentKind::Pi.native_support(), NativeSupport::Full);
         assert_eq!(AgentKind::Omp.native_support(), NativeSupport::Partial);
-        assert_eq!(AgentKind::Codex.native_support(), NativeSupport::None);
+        assert_eq!(AgentKind::Codex.native_support(), NativeSupport::Partial);
+        assert_eq!(AgentKind::Aider.native_support(), NativeSupport::None);
     }
 }

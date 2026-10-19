@@ -33,10 +33,13 @@ pub struct ExternalInsight {
     pub error_msg: Option<String>,
     pub blocked_msg: Option<String>,
     pub children: Vec<OscRecord>,
+    /// Counts turns, so a turn that starts and ends between two polls still reads as new.
+    pub turn: u64,
 }
 
 impl ExternalInsight {
     pub(crate) fn begin_turn(&mut self) {
+        self.turn = self.turn.wrapping_add(1);
         self.state = Some(OscState::Working);
         self.working_msg = None;
         self.done_msg = None;

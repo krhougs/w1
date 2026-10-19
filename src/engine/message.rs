@@ -97,7 +97,7 @@ fn extract_blocked_message(
         if clean.is_empty() || is_footer_hint_line(clean) || is_option_choice_line(clean) {
             continue;
         }
-        if clean.chars().count() >= 6 {
+        if clean.chars().count() >= 6 && clean.chars().any(char::is_alphanumeric) {
             return crate::osc7501::sanitize_single_line(clean, 240);
         }
     }

@@ -25,6 +25,8 @@ pub struct ScreenDetection {
     pub visible_idle: bool,
     pub visible_blocker: bool,
     pub visible_working: bool,
+    /// Working that only counts during a turn the user started.
+    pub turn_only: bool,
     pub matched_rule_id: Option<String>,
     pub detail: Option<String>,
 }
@@ -38,6 +40,7 @@ impl Default for ScreenDetection {
             visible_idle: false,
             visible_blocker: false,
             visible_working: false,
+            turn_only: false,
             matched_rule_id: None,
             detail: None,
         }
@@ -73,6 +76,11 @@ struct ManifestRule {
     visible_blocker: bool,
     #[serde(default)]
     visible_working: bool,
+    #[serde(default)]
+    turn_only: bool,
+    /// Fixed `msg`, for screens whose text makes a poor summary.
+    #[serde(default)]
+    msg: Option<String>,
     #[serde(default)]
     contains: Vec<String>,
     #[serde(default)]
@@ -265,7 +273,10 @@ pub fn detect(agent: Option<AgentKind>, input: DetectionInput<'_>) -> ScreenDete
             .unwrap_or(DetectedState::Unknown);
         let blocked_kind = (state == DetectedState::Blocked)
             .then(|| classify_blocked_kind(&rule.id, input.screen, input.osc_title));
-        let detail = extract_screen_detail(agent, state, &rule.id, input);
+        let detail = rule
+            .msg
+            .clone()
+            .or_else(|| extract_screen_detail(agent, state, &rule.id, input));
 
         return ScreenDetection {
             state,
@@ -274,6 +285,7 @@ pub fn detect(agent: Option<AgentKind>, input: DetectionInput<'_>) -> ScreenDete
             visible_idle: rule.visible_idle && state == DetectedState::Idle,
             visible_blocker: rule.visible_blocker && state == DetectedState::Blocked,
             visible_working: rule.visible_working && state == DetectedState::Working,
+            turn_only: rule.turn_only && state == DetectedState::Working,
             matched_rule_id: Some(rule.id.clone()),
             detail,
         };

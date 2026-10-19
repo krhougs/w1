@@ -30,3 +30,16 @@ priority = 100
 region = "bottom_non_empty_lines(3)"
 visible_idle = true
 line_regex = ['^(?:[a-zA-Z0-9_-]+\s+)?>\s*$']
+
+# Streamed replies show no spinner: after a submit, anything but the prompt at the bottom is
+# the reply being written.
+[[rules]]
+id = "turn_output_working"
+state = "working"
+priority = 50
+region = "bottom_non_empty_lines(1)"
+turn_only = true
+not = [
+  { line_regex = ['^(?:[a-zA-Z0-9_-]+\s*)?>(?:\s|$)'] },
+  { line_regex = ['^─+$'] },
+]
